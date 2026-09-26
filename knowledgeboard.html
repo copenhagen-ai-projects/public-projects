@@ -1275,8 +1275,8 @@ const CHAPTERS = [
   { n: 2, q: 'Hvad skal der til for at gøre det til en succes?', sub: 'Tweak it to love it. Hver stemme bygger videre på en udfordring fra panelet.' },
   { n: 3, q: 'Sammenfatning', sub: 'Moderatoren samler panelets indstillinger til én rapport.' },
 ];
-// tidsrammer (ms): kapitel 1 og 2 har hver en fast ramme; kapitel 3 er en animeret pause paa 6-10 s
-const TIMING = { ch1: 15000, ch2: 15000, ch3min: 6000, ch3max: 10000, ch3grace: 25000, card: 2300 };
+// tidsrammer (ms): kapitel 1 og 2 har hver en fast ramme (20 s); kapitel 3 er en animeret pause paa 6-10 s
+const TIMING = { ch1: 20000, ch2: 20000, ch3min: 6000, ch3max: 10000, ch3grace: 25000, card: 2300 };
 
 // ── smaa hjaelpere ──
 const typo = (s) => String(s == null ? '' : s).replace(/"([^"\n]{1,240})"/g, '»$1«').replace(/ - /g, ', ');
@@ -1687,29 +1687,44 @@ function background(my, live) {
 }
 // ét kapitel i en fast tidsramme: vis de svar der er kommet, fordelt over rammen
 async function chapterWindow(my, n, q, total, doneFlag) {
+  // Max 2 bobler ad gangen (1 paa mobil), og hver boble staar laenge nok til at kunne laeses (5,5-9 s efter laengde).
+  // Svar der ikke faar en boble, glider stille ind i chatpanelet og referatet: man behoever ikke naa dem alle.
   const t0 = performance.now(), dur = n === 1 ? TIMING.ch1 : TIMING.ch2, tEnd = t0 + dur;
+  const MAXB = MOBILE ? 1 : 2;
   skipCh = false;
   await showChapter(n, total); if (!alive(my)) return;
-  let shown = 0, nextAt = 0;
+  let shown = 0, nextBub = 0, nextQuiet = 0;
+  const count = () => { chEl.querySelector('.cp').textContent = `${shown} af ${total || P.length} har talt`; };
   while (alive(my)) {
     const now = performance.now(), left = tEnd - now;
     setClock(left);
     if (left <= 0 || skipCh) break;
-    if (q.length && now >= nextAt) {
-      const it = q.shift(); shown++;
-      const remaining = Math.max(1, (total || P.length) - shown + 1);
-      const gap = clamp((left - 2600) / remaining, 700, 3200);
-      const lineDur = Math.min(clamp(gap * 2.7, 3000, 5600), Math.max(1600, left - 250));
-      markSpoke(it.pid); chEl.querySelector('.cp').textContent = `${shown} af ${total || P.length} har talt`;
-      showLine(it, lineDur); nextAt = now + gap;
+    if (q.length && R.speakers.length < MAXB && now >= nextBub && left > 5000) {
+      const it = q.shift(); shown++; count(); markSpoke(it.pid);
+      const words = String(it.text).split(/\s+/).length;
+      const d = Math.min(clamp(2600 + words * 240, 5500, 9000), left - 300);
+      showLine(it, d); nextBub = now + d * (MAXB > 1 ? 0.5 : 1) + 250;
+    } else if (q.length && now >= nextQuiet && (R.speakers.length >= MAXB || left <= 5000)) {
+      const it = q.shift(); shown++; count(); markSpoke(it.pid); quietLine(it);
+      nextQuiet = now + clamp((left - 1200) / Math.max(1, q.length + 1), 700, 2600);
     }
     if (doneFlag() && !q.length && shown > 0 && !R.speakers.length && left > 1200) {   // alle har talt: vent ikke paa uret
       await wait(600); break;
     }
     await wait(120);
   }
+  while (q.length && alive(my)) { const it = q.shift(); shown++; markSpoke(it.pid); quietLine(it); }   // ingen svar gaar tabt
   setClock(0);
   P.forEach((p, i) => endLine(i));
+}
+// et svar uden boble: kort lys i navneskiltet, stemmen saettes, teksten i chatpanelet
+function quietLine(it) {
+  if (it.run !== RUNID) return;
+  const i = PBY[it.pid], j = it.target != null ? PBY[it.target] : null;
+  R.pers[i].think = false; R.pers[i].bt = clock; setVote(i, it.vote); ripple(CH[i].head.clone(), 0.01);
+  chatLine(i, j != null && j !== i ? j : null, it.text);
+  labs[i].classList.add('speaking'); const my = RUNID;
+  setTimeout(() => { if (my === RUNID && !bubs[i].classList.contains('speak')) labs[i].classList.remove('speaking'); }, 1600);
 }
 async function run(my) {
   LOG = []; R1 = {}; R2 = {}; SY = null; SESSION = null; lastErr = null;
