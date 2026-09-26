@@ -1234,7 +1234,7 @@ const CH = P.map((p, i) => {
 });
 
 // ═══ MOTOR: /api/board (Vercel-function med OpenRouter) eller demo ═════════
-const E = { mode: 'probe', live: false, model: '', code: false };
+const E = { mode: 'probe', live: false, model: '', synth: '', code: false };
 const CODEK = 'kb.board.code.v1';
 let ACCESS = ''; try { ACCESS = localStorage.getItem(CODEK) || ''; } catch (e) {}
 try { const q = new URLSearchParams(location.search).get('kode'); if (q) { ACCESS = q; localStorage.setItem(CODEK, q); } } catch (e) {}
@@ -1249,7 +1249,7 @@ function paintEngine() {
 }
 async function probeEngine() {
   if (/^https?:$/.test(location.protocol)) {
-    try { const r = await fetch('/api/kb-health', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && j.ok) { E.live = !!j.live; E.model = j.model || ''; E.code = !!j.code; } } } catch (e) {}
+    try { const r = await fetch('/api/kb-health', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && j.ok) { E.live = !!j.live; E.model = j.model || ''; E.synth = j.synth || ''; E.code = !!j.code; } } } catch (e) {}
   }
   E.mode = E.live ? 'live' : 'demo';
   paintEngine();
@@ -1262,7 +1262,7 @@ function api(op, payload, tries) {
         const c = window.prompt(ACCESS ? 'Forkert adgangskode. Prøv igen:' : 'Boardet kræver en adgangskode:', '');
         if (c) { ACCESS = c.trim(); try { localStorage.setItem(CODEK, ACCESS); } catch (e) {} return api(op, payload, tries); }
       }
-      if ((r.status >= 500 || r.status === 429) && (tries || 0) < 1 && op !== 'screen') return sleep(700).then(() => api(op, payload, 1));
+      if ((r.status >= 500 || r.status === 429) && (tries || 0) < 1 && op !== 'screen') return sleep(700).then(() => api(op, op === 'synth' ? Object.assign({}, payload, { fallback: true }) : payload, 1));
       throw { code: j.code || 'http_' + r.status, message: j.error || ('HTTP ' + r.status) };
     }));
 }
@@ -1681,7 +1681,7 @@ function background(my, live) {
     if (!alive(my) || S.dead) return null;
     if (!live) return sleep(1800).then(() => JSON.parse(JSON.stringify(DEMO.synth)));
     const r2s = {}; P.forEach(p => { const b = R2[p.id]; if (b) r2s[p.id] = { target: b.target, forslag: b.forslag, endelig: b.endelig, stemme: b.stemme }; });
-    return api('synth', Object.assign({ r1: r1s(), r2: r2s }, SESSION)).then(j => j.res);
+    return api('synth', Object.assign({ r1: r1s(), r2: r2s }, SESSION)).then(j => { S.synthModel = j.model; return j.res; });
   }).then((sy) => { S.synth = sy; S.synthDone = true; return sy; }, (e) => { lastErr = e; S.synthDone = true; return null; });
   return S;
 }
@@ -1763,7 +1763,7 @@ async function run(my) {
       await wait(150);
     }
     if (!alive(my)) return;
-    SY = S.synth || fallbackSynth();
+    SY = S.synth || fallbackSynth(); if (CUR) CUR.synthModel = S.synth ? S.synthModel : '';
     chEl.querySelector('.cp').textContent = 'Rapporten er klar';
     pressDone();
     await wait(900); if (!alive(my)) return;
@@ -1823,7 +1823,7 @@ function showReport() {
   const date = new Date().toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' });
   const pe = sy.panel_eval && typeof sy.panel_eval === 'object' ? sy.panel_eval : null;
   const card = (x, k) => `<div class="rp-card"><div class="rp-n">${k + 1}</div><div><h5>${esc(x.titel || '')}</h5><p>${esc(x.tekst || '')}</p><div class="rp-who">${who(x.hvem)}</div></div></div>`;
-  const engine = CUR && CUR.mode === 'demo' ? 'demo' : modelName(CUR && CUR.model);
+  const engine = CUR && CUR.mode === 'demo' ? 'demo' : modelName(CUR && CUR.model) + (CUR && CUR.synthModel && CUR.synthModel !== CUR.model ? ' · rapport: ' + modelName(CUR.synthModel) : '');
   $('#rp-doc').innerHTML =
     `<header class="rp-hd"><div class="rp-brand"><b>knowledge</b><span>board</span></div><div class="rp-meta">Validering af pitch &middot; ${esc(date)}<br>Simuleret panel &middot; ${n} anonyme roller &middot; ${esc(engine)}</div></header>` +
     `<div class="rp-top"><span class="rp-kick">${esc(EMNE || 'Pitch')}</span><span class="rp-dom ${domCls}"><i></i>${esc(dom)}</span></div>` +
