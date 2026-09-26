@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asgaard Metals | Circular Production of Billets &amp; Powder</title>
+<meta name="description" content="Asgaard Metals sustainably produces high-end tool steel and metal powder from scrap metal through a patent-pending Spray Forming process, powered by green energy.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!--
+  Asgaard Metals - landing concept (render-studio, 2026-09-26). Koncept, ikke publiceret (andet firmas brand).
+  Helteobjekt: EN smeltet straale der atomiseres til en gnistkegle; den samme spray bygger en billet (ODIN) og drysser pulver (THOR).
+  Materiale-grammatik: rust/mat = skrot · gloedende orange = Spray Forming · spejlpoleret staal = ODIN billet · soelvkorn = THOR pulver.
+  Motor: kopieret fra skills/ui-design/render-studio/examples/movingimages-landing.html (SDF-raymarch i cyc-studie + DOF/bloom/linse/ACES),
+  vaeske-shading byttet til metal + sortlegeme-emission, gnister/pulver/ring som GPU-partikler, varmeflimmer bryder vaeg-teksten.
+
+  STAGE-KORT (S = sektion; scroll driver et kontinuerligt S)
+  #  Kapitel (deres copy)                 Objektet                                              Kamera            Baggrund
+  0  Circular Production of Billets...    Straale haelder ind, atomiseres, billet gloeder        frontal           moerk vaerksted, orange glød
+  1  Our Story (1932 / 2021)              Samme proces, "1932" paa vaeggen                      pan til siden     moerk varm
+  2  Step 1: Scrap collection             Straalen lukker, billet traekkes ned; 4 skrotdele      ned mod gulvet    lys beton (aandehul)
+                                          (tandhjul, lejering, bor, afskaer) falder ind. Traek-bare.
+  3  Step 2: Spray forming (pinned 300vh) Skrot fodres op, straale taender, kegle, billet vokser,  frontal, tilbage  moerk
+                                          pulver drysser til bunken
+  4  Duality                              Billet koeler til staal, bunken ved siden af,          frontal           lys
+                                          "1.4125" paa vaeggen, labels
+  5  Premium quality                      Billetten skaeres over; mikrostruktur paa snitfladen    macro             moerk
+                                          (slider: spray formed <-> konventionelt stoebt, skematisk)
+  6  Step 3: One-to-one delivery          Oppefra: billettens gloedende top = prikken, gnist-ring  top-down          varm moerk
+                                          med aabning = logoets form
+  7  Products                             Hover skifter ODIN (billet) / THOR (pulverbunke)        objekt til hoejre lys
+  8  Contact                              Moerkefelt: poleret billet, sidste gloed i toppen        frontal           sort
+  Copy: deres tone of voice. Overskrifter = deres egne sektions-/trin-navne (Our Story, Scrap collection, Spray forming, Duality, Premium quality steel and powders,
+  One-to-one delivery, Products, Get in touch!). Broedtekst ordret fra asgaardmetals.com + produktsider (2026-09-26); kun let forkortet, ingen egne paastande.
+  Hero-variant: HERO_VARIANT i modul-scriptet ('ring' = logo-cirklen oppefra, 'classic' = original), eller ?hero=classic.
+  Ring-hero er zoomet ind paa landscape (HERO_ZOOM): kun oeverste bue, prik + soejle under folden indtil scroll. Portraet viser hele maerket.
+  Debug: window.__FORCE_S=<tal>, window.__FORCE_GRAIN=<0..1>, window.__FORCE_PROD=<0..3> foer modul-scriptet.
+-->
+<style>
+:root{
+  --pad: clamp(20px, 4.6vw, 72px);
+  --ease: cubic-bezier(.16,1,.3,1);
+  --or: #e15601;
+  --ink: #f3efe9;
+  --dk: #15130f;
+}
+*{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;background:#0c0b0a}
+body{margin:0;background:transparent;color:var(--ink);font-family:"ChesnaGrotesk","Hanken Grotesk",system-ui,-apple-system,"Helvetica Neue",sans-serif;font-weight:400;overflow-x:hidden}
+body.nogl{background:radial-gradient(90% 70% at 50% 35%,#6a2a08 0%,#1a1410 55%,#0c0b0a 100%) fixed}
+a{color:inherit}
+#gl{position:fixed;inset:0;width:100vw;height:100vh;height:100lvh;z-index:0;display:block}
+main{position:relative;z-index:1}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* loader */
+#am-load{position:fixed;inset:0;z-index:50;background:#0c0b0a;display:grid;place-items:center;transition:opacity 1.1s var(--ease),visibility 1.1s}
+#am-load img{width:54px;height:auto;display:block;margin:0 auto;animation:am-pulse 1.6s var(--ease) infinite}
+#am-load i{display:block;width:120px;height:1px;margin-top:22px;background:rgba(225,86,1,.8);transform-origin:left;animation:am-bar 1.6s var(--ease) infinite}
+@keyframes am-bar{0%{transform:scaleX(0)}60%{transform:scaleX(1)}100%{transform:scaleX(1);opacity:0}}
+@keyframes am-pulse{0%,100%{opacity:.55}50%{opacity:1}}
+body.ready #am-load{opacity:0;visibility:hidden}
+
+/* nav */
+.am-nav{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;justify-content:space-between;align-items:center;padding:20px var(--pad);color:var(--nav,#fff);pointer-events:none;transform:translateY(0);transition:color .5s var(--ease),transform .7s var(--ease)}
+.am-nav.away{transform:translateY(-110%)}
+.am-nav a{pointer-events:auto;text-decoration:none}
+.am-logo{display:flex;align-items:center;gap:10px}.am-logo img{display:block;height:28px;width:auto}.am-logo span{font-size:21px;font-weight:700;letter-spacing:-.015em}
+.am-links{display:flex;gap:28px;font-size:15px;font-weight:600;letter-spacing:.01em}
+.am-links a{position:relative}
+.am-links a::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:1.5px;background:var(--or);transform:scaleX(0);transform-origin:right;transition:transform .5s var(--ease)}
+.am-links a:hover::after{transform:scaleX(1);transform-origin:left}
+
+/* progress rail */
+.am-rail{position:fixed;right:calc(var(--pad) * .42);top:50%;transform:translateY(-50%);z-index:0;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.am-rail b{display:block;width:6px;height:6px;border-radius:50%;background:var(--nav,#fff);opacity:.28;transition:opacity .4s,transform .4s var(--ease),background .4s}
+.am-rail b.on{opacity:1;transform:scale(1.5);background:var(--or)}
+
+/* sections */
+.am{position:relative;min-height:100vh;padding:0 var(--pad)}
+.kick{font-size:12px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--or)}
+.rv{opacity:0;transform:translateY(34px);transition:opacity 1.1s var(--ease),transform 1.1s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}.rv.d3{transition-delay:.24s}.rv.d4{transition-delay:.32s}
+h1,h2{font-weight:600;letter-spacing:-.022em}
+.lt{color:var(--dk)}
+
+/* 0 hero */
+.am-hero{display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:clamp(26px,5vh,54px)}
+.am-hero .row{display:grid;grid-template-columns:1.25fr 1fr;gap:40px;align-items:end}
+.am-hero h1{font-size:clamp(38px,4.9vw,78px);line-height:.98;margin:14px 0 0}
+.am-hero .tag{justify-self:end;max-width:430px;font-size:clamp(15px,1.12vw,18px);line-height:1.55;margin:0;color:rgba(243,239,233,.86)}
+.am-hero .ctas{display:flex;gap:14px;align-items:center;margin-top:24px;flex-wrap:wrap}
+.hl{overflow:hidden;display:block}
+.hl > span{display:block;transform:translateY(105%);transition:transform 1.4s var(--ease)}
+body.ready .hl > span{transform:none}
+body.ready .hl.d1 > span{transition-delay:.15s} body.ready .hl.d2 > span{transition-delay:.3s} body.ready .hl.d3 > span{transition-delay:.45s}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:14px 22px;border-radius:40px;background:var(--or);color:#fff;text-decoration:none;font-weight:700;font-size:15px;transition:transform .5s var(--ease),box-shadow .5s var(--ease)}
+.btn:hover{transform:translateY(-2px);box-shadow:0 18px 40px -12px rgba(225,86,1,.6)}
+.lnk{font-weight:600;font-size:15px;text-decoration:none;border-bottom:1px solid currentColor;padding-bottom:3px}
+
+/* 1 story */
+.am-story{display:flex;align-items:center}
+.am-story .box{max-width:min(520px,42vw)}
+.am-story h2{font-size:clamp(46px,6.2vw,104px);line-height:.94;margin:16px 0 26px}
+.am-story p{font-size:clamp(15px,1.1vw,17.5px);line-height:1.62;color:rgba(243,239,233,.82);margin:0 0 14px;max-width:480px}
+.am-story blockquote{margin:24px 0 0;font-size:clamp(19px,1.6vw,24px);letter-spacing:-.012em;font-weight:500;line-height:1.35;max-width:480px}
+.am-story figure{margin:30px 0 0;display:flex;gap:16px;align-items:flex-end}
+.am-story figure img{width:190px;aspect-ratio:1/1;object-fit:cover;border-radius:4px;filter:grayscale(1) contrast(1.05);display:block;box-shadow:0 20px 40px -18px rgba(0,0,0,.7)}
+.am-story figcaption{font-size:12.5px;color:rgba(243,239,233,.55);line-height:1.5}
+
+/* 2 scrap */
+.am-scrap{padding-top:16vh}
+.am-scrap .box{max-width:500px}
+.am-scrap h2{font-size:clamp(40px,4.8vw,80px);line-height:.96;margin:16px 0 22px}
+.am-scrap p{font-size:clamp(15px,1.1vw,17.5px);line-height:1.6;margin:0 0 12px;color:rgba(21,19,15,.78)}
+.am-scrap .fine{font-size:13.5px;color:rgba(21,19,15,.58);max-width:420px}
+
+/* 3 process (pinned) */
+.am-proc{height:300vh;padding:0}
+.am-proc .pin{position:sticky;top:0;height:100vh;overflow:hidden;padding:0 var(--pad)}
+.am-proc .head{position:absolute;left:var(--pad);top:clamp(90px,13vh,150px);max-width:470px}
+.am-proc h2{font-size:clamp(44px,5.4vw,92px);line-height:.94;margin:16px 0 22px}
+.am-proc .head p{font-size:clamp(15px,1.1vw,17.5px);line-height:1.6;color:rgba(243,239,233,.8);margin:0}
+.steps3{position:absolute;left:var(--pad);bottom:clamp(56px,11vh,120px);width:min(470px,36vw);list-style:none;margin:0;padding:0;border-top:1px solid rgba(243,239,233,.2)}
+.steps3 li{padding:13px 0;border-bottom:1px solid rgba(243,239,233,.2);opacity:.32;transition:opacity .6s var(--ease)}
+.steps3 li.on{opacity:1}
+.steps3 i{font-style:normal;font-size:11.5px;font-weight:700;letter-spacing:.16em;color:var(--or)}
+.steps3 b{display:block;font-size:20px;font-weight:600;letter-spacing:-.015em;margin:6px 0 6px}
+.steps3 span{display:block;font-size:13.5px;line-height:1.5;color:rgba(243,239,233,.72)}
+.pbar{position:absolute;left:var(--pad);bottom:clamp(40px,8vh,96px);width:min(470px,36vw);height:2px;background:rgba(243,239,233,.16)}
+.pbar i{display:block;height:100%;background:var(--or);transform-origin:left;transform:scaleX(0)}
+
+/* 4 duality */
+.am-dual{display:flex;align-items:center}
+.am-dual .box{max-width:min(470px,38vw)}
+.am-dual h2{font-size:clamp(40px,4.8vw,80px);line-height:.96;margin:16px 0 22px}
+.am-dual p{font-size:clamp(14.5px,1.05vw,17px);line-height:1.6;margin:0 0 12px;color:rgba(21,19,15,.78)}
+.am-dual p.fine2{font-size:13.5px;color:rgba(21,19,15,.6)}
+.chem{margin-top:22px;border-top:1px solid rgba(21,19,15,.25);padding-top:14px}
+.chem .ttl{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(21,19,15,.6);margin-bottom:10px}
+.chem table{border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}
+.chem th{font-weight:700;text-align:left;padding:4px 18px 4px 0;color:rgba(21,19,15,.55);font-size:12px}
+.chem td{padding:4px 18px 4px 0;font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:22px;font-size:12.5px;font-weight:600;color:rgba(21,19,15,.72)}
+.legend span{display:inline-flex;align-items:center;gap:8px}
+.legend i{width:14px;height:14px;border-radius:50%;display:inline-block}
+.sw-rust{background:radial-gradient(circle at 35% 35%,#9a5a36,#4a1e0c)}
+.sw-hot{background:radial-gradient(circle at 40% 40%,#ffe2a0,#e15601 55%,#7a1d00);box-shadow:0 0 10px rgba(225,86,1,.7)}
+.sw-steel{background:linear-gradient(135deg,#f4f5f7,#8b9097 45%,#e6e8eb 60%,#5c6168)}
+.sw-powder{background:radial-gradient(circle,#c9cacc 18%,transparent 20%) 0 0/5px 5px,#8c8c8a}
+.olab{position:absolute;left:0;top:0;width:200px;margin-left:-100px;text-align:center;opacity:0;will-change:transform,opacity;color:var(--dk);pointer-events:none}
+.olab b{display:block;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.olab span{display:block;font-size:12.5px;color:rgba(21,19,15,.6);margin-top:3px}
+
+/* 5 macro */
+.am-macro{display:flex;align-items:center}
+.am-macro .box{max-width:min(460px,36vw)}
+.am-macro h2{font-size:clamp(36px,3.9vw,64px);line-height:.96;margin:16px 0 22px}
+.am-macro p{font-size:clamp(14.5px,1.05vw,17px);line-height:1.6;margin:0 0 20px;color:rgba(243,239,233,.8)}
+.grain{margin:6px 0 24px}
+.grain .ends{display:flex;justify-content:space-between;font-size:12.5px;font-weight:700;letter-spacing:.06em;margin-bottom:10px}
+.grain .ends span:first-child{color:var(--or)}
+.grain input{width:100%;accent-color:var(--or);cursor:pointer}
+.grain small{display:block;margin-top:8px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:rgba(243,239,233,.45)}
+.spec{display:grid;grid-template-columns:auto 1fr;gap:8px 22px;font-size:13.5px;border-top:1px solid rgba(243,239,233,.24);padding-top:16px;margin:0}
+.spec dt{color:rgba(243,239,233,.55)}.spec dd{margin:0;font-weight:600}
+
+/* 6 one-to-one */
+.am-loop{padding-top:15vh;padding-bottom:8vh;display:flex;flex-direction:column}
+.am-loop .top{max-width:min(520px,40vw)}
+.am-loop .big{font-size:clamp(110px,15vw,250px);font-weight:600;letter-spacing:-.04em;line-height:.8;margin:14px 0 22px}
+.am-loop .big em{font-style:normal;color:var(--or)}
+.am-loop p{font-size:clamp(14.5px,1.05vw,17px);line-height:1.6;margin:0;color:rgba(243,239,233,.82)}
+.stats{display:flex;gap:34px;margin-top:28px;flex-wrap:wrap}
+.stats b{display:block;font-size:clamp(26px,2.4vw,38px);font-weight:600;letter-spacing:-.02em}
+.stats span{display:block;font-size:12.5px;color:rgba(243,239,233,.6);margin-top:2px;max-width:150px;line-height:1.4}
+.pillars{margin-top:auto;padding-top:60px;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid rgba(243,239,233,.24);max-width:62%}
+.pillars div{padding:20px 26px 0 0}
+.pillars i{font-style:normal;font-size:11.5px;font-weight:700;letter-spacing:.16em;color:var(--or);text-transform:uppercase}
+.pillars b{display:block;font-size:20px;font-weight:600;margin:10px 0 8px}
+.pillars p{font-size:13.5px;line-height:1.55;color:rgba(243,239,233,.72);margin:0}
+
+/* 7 products */
+.am-prod{padding-top:17vh;padding-bottom:14vh;color:var(--dk)}
+.am-prod .top{max-width:52%;margin-bottom:34px}
+.am-prod h2{font-size:clamp(44px,5.4vw,90px);line-height:.94;margin:16px 0 16px}
+.am-prod .top p{font-size:15px;line-height:1.55;color:rgba(21,19,15,.7);margin:0;max-width:420px}
+.prods{max-width:52%;border-top:1px solid rgba(21,19,15,.8)}
+.prod{display:grid;grid-template-columns:1fr 1.35fr 22px;gap:22px;align-items:baseline;padding:22px 0;border-bottom:1px solid rgba(21,19,15,.2);text-decoration:none;position:relative}
+.prod .t{font-size:clamp(24px,2.1vw,34px);font-weight:700;letter-spacing:-.02em;line-height:1.05;transition:transform .6s var(--ease),color .4s}
+.prod .t small{display:block;font-size:12.5px;letter-spacing:.02em;font-weight:600;color:rgba(21,19,15,.5);margin-top:7px}
+.prod .d{font-size:14px;line-height:1.5;color:rgba(21,19,15,.72)}
+.prod .d em{display:block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--or);margin-bottom:6px}
+.prod .a{font-size:18px;transition:transform .6s var(--ease)}
+.prod:hover .t,.prod:focus-visible .t,.prod.sel .t{transform:translateX(10px);color:var(--or)}
+.prod:hover .a,.prod:focus-visible .a{transform:translate(4px,-4px)}
+.am-prod .sheet{display:inline-block;margin-top:26px}
+
+/* 8 contact */
+.am-end{display:flex;flex-direction:column;justify-content:space-between;padding-top:20vh;padding-bottom:28px}
+.am-end .big{text-align:center}
+.am-end h2{font-size:clamp(50px,7.6vw,128px);line-height:.9;margin:16px 0 26px}
+.am-end .sub{max-width:460px;margin:0 auto 30px;font-size:16px;line-height:1.55;color:rgba(243,239,233,.7)}
+.am-end .mail{font-size:clamp(19px,1.7vw,26px);font-weight:600;text-decoration:none;border-bottom:1px solid rgba(225,86,1,.8);padding-bottom:4px}
+.am-end .btn{margin-top:28px}
+.people{display:flex;justify-content:center;gap:56px;margin-top:54px;flex-wrap:wrap;text-align:left}
+.people b{display:block;font-size:16px;font-weight:700}
+.people span{display:block;font-size:13.5px;color:rgba(243,239,233,.6);margin-top:3px;line-height:1.5}
+.am-end .foot{display:flex;justify-content:space-between;gap:20px;font-size:12.5px;color:rgba(243,239,233,.5);flex-wrap:wrap;margin-top:60px}
+.am-end .foot a{text-decoration:none}
+
+/* cursor */
+.am-cur{position:fixed;left:0;top:0;z-index:40;pointer-events:none;width:0;height:0}
+.am-cur i{position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:#fff;mix-blend-mode:difference}
+.am-cur b{position:absolute;left:-19px;top:-19px;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(255,255,255,.9);mix-blend-mode:difference;transition:transform .45s var(--ease),opacity .3s}
+.am-cur span{position:absolute;left:30px;top:-7px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#fff;mix-blend-mode:difference;opacity:0;transition:opacity .3s;white-space:nowrap}
+.am-cur.obj b{transform:scale(1.9)} .am-cur.obj span{opacity:.9}
+.am-cur.hold b{transform:scale(.7)}
+.am-cur.link b{transform:scale(1.35);opacity:.5}
+@media (hover:hover) and (pointer:fine){ body.cur, body.cur a{cursor:none} body.cur input{cursor:pointer} }
+
+@media (max-width: 860px){
+  .am-links{display:none}
+  .kick{font-size:11px;letter-spacing:.13em}
+  .am-logo img{height:22px}.am-logo span{font-size:17px}
+  .am-hero .row{grid-template-columns:1fr;gap:16px}
+  .am-hero .tag{justify-self:start}
+  .am-story{align-items:flex-end;padding-bottom:8vh}
+  .am-story .box,.am-dual .box,.am-macro .box,.am-loop .top{max-width:100%}
+  .am-story figure img{width:120px}
+  .am-scrap{padding-top:13vh}
+  .am-proc .head{top:88px;right:var(--pad)}
+  .am-proc h2{font-size:40px}
+  .am-proc .head p{display:none}
+  .steps3{left:var(--pad);right:var(--pad);width:auto;bottom:34px}
+  .steps3 li{padding:10px 0}
+  .steps3 li span{display:none}
+  .steps3 b{font-size:16px;margin:4px 0 0}
+  .pbar{display:none}
+  .am-dual{align-items:flex-start;padding-top:12vh}
+  .am-dual .chem,.am-dual .legend{display:none}
+  .am-macro{align-items:flex-end;padding-bottom:6vh}
+  .am-macro .box{background:linear-gradient(180deg,rgba(12,11,10,0),rgba(12,11,10,.78) 22%);padding:26px 18px 18px;margin:0 calc(var(--pad) * -1);max-width:none}
+  .am-macro .spec{display:none}
+  .am-loop .big{font-size:96px}
+  .pillars{max-width:none;width:calc(100% + var(--pad) * 2);grid-template-columns:1fr;row-gap:6px;border-top:0;background:linear-gradient(180deg,rgba(12,11,10,0),rgba(12,11,10,.72) 70px);margin:0 calc(var(--pad) * -1);padding:70px var(--pad) 10px}
+  .pillars div{padding-top:14px}
+  .am-prod .top,.prods{max-width:100%}
+  .prods{background:rgba(238,236,232,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  .prod{grid-template-columns:1fr 18px;gap:10px}
+  .prod .d{grid-column:1 / 2}
+  .prod .t{grid-column:1;grid-row:1} .prod .a{grid-column:2;grid-row:1}
+  html,body{overflow-x:clip}
+  .people{gap:26px}
+  .am-cur,.am-rail{display:none}
+  .olab{width:150px;margin-left:-75px}
+  .olab span{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .rv{transition:none;opacity:1;transform:none}
+}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="am-load"><div><img src="https://asgaardmetals.com/wp-content/uploads/2023/04/AM-LOGO_ORANGE.png" alt=""><i></i></div></div>
+<canvas id="gl" aria-hidden="true"></canvas>
+<div class="am-cur" aria-hidden="true"><b></b><i></i><span>heat</span></div>
+
+<nav class="am-nav">
+  <a class="am-logo" href="https://asgaardmetals.com/"><img src="https://asgaardmetals.com/wp-content/uploads/2023/04/AM-LOGO_ORANGE.png" alt=""><span>Asgaard Metals</span></a>
+  <div class="am-links"><a href="#story">Our Story</a><a href="#sustainability">Sustainability</a><a href="#products">Products</a><a href="#contact">Contact</a></div>
+</nav>
+<div class="am-rail" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
+
+<main>
+  <!-- 0 -->
+  <section class="am am-hero" data-stage="0">
+    <div class="row">
+      <div>
+        <div class="kick hl"><span>Asgaard Metals · Frederiksværk, Denmark</span></div>
+        <h1><span class="hl d1"><span>Circular Production</span></span><span class="hl d2"><span>of Billets &amp; Powder</span></span></h1>
+      </div>
+      <div>
+        <p class="tag hl d2"><span>At Asgaard Metals, we are sustainably producing high-end metal and metal powder from scrap metal. We are rethinking how sustainable metals and powders are made through our patent-pending Spray Forming Process, which is exclusively powered by green and sustainable energy.</span></p>
+        <div class="ctas hl d3"><span style="display:flex;gap:18px;align-items:center;flex-wrap:wrap"><a class="btn" href="#process">See more <span>↓</span></a><a class="lnk" href="#contact">Get in touch!</a></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 -->
+  <section class="am am-story" id="story" data-stage="1">
+    <div class="box">
+      <div class="kick rv">Since 1932</div>
+      <h2 class="rv d1">Our<br>Story</h2>
+      <p class="rv d2">Our story started back in 1932 with Nordisk Staal, a traditional blacksmithing company in Denmark. Way before that, our local area was home to hunters, Vikings, and blacksmiths. Later it became Frederiksværk, our hometown, which was based on handcraft - and forging metals from the Earth.</p>
+      <p class="rv d2">Based on our heritage, Asgaard Metals was a spin-off from Nordisk Staal and was founded in 2021, merging the forging of metals with high-tech engineering. A new method with radical impact.</p>
+      <blockquote class="rv d3">Our products are named ODIN and THOR, our place is called Asgaard and we, the people, call ourselves Asgardians. All with a glimpse in the eye, of course.</blockquote>
+      <figure class="rv d4"><img loading="lazy" src="https://asgaardmetals.com/wp-content/uploads/2023/03/NS-1937_BW.jpg" alt="The Nordisk Staal workforce in 1937"><figcaption>Nordisk Staal,<br>10/9 1937</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="am am-scrap lt" data-stage="2">
+    <div class="box">
+      <div class="kick rv">How our Circular Model works · Step 1</div>
+      <h2 class="rv d1">Scrap<br>collection</h2>
+      <p class="rv d2">Based on the composition and volume of your material, we pool you into one of our Recycle Communities. With our process you can return excess steel, used parts, tools, and other used metals.</p>
+      <p class="fine rv d3">The valuable alloying elements of your end-of-life tools or products are kept in the steel, without being blended, unnecessarily diluted, and remelted as currently practiced in the industry.</p>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="am am-proc" id="process" data-stage="3">
+    <div class="pin">
+      <div class="head">
+        <div class="kick rv">How our Circular Model works · Step 2</div>
+        <h2 class="rv d1">Spray<br>forming</h2>
+        <p class="rv d2">We directly transform your scrap into premium powders and solid steel. By disrupting conventional routes, we preserve valuable alloying elements, eliminate the use of primary resources and avoid unnecessary remelting.</p>
+      </div>
+      <ol class="steps3">
+        <li><i>01</i><b>One-step process</b><span>Unlike typical high-end steel making, our one-step process enables the single melting of scrap into high-quality metal with unrivaled energy efficiency.</span></li>
+        <li><i>02</i><b>Patent-pending Spray Forming</b><span>Exclusively powered by green and sustainable energy.</span></li>
+        <li><i>03</i><b>Billets &amp; Powder</b><span>A material efficiency close to 100%, preserving precious alloying elements in the global value chain.</span></li>
+      </ol>
+      <div class="pbar"><i></i></div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="am am-dual lt" data-stage="4">
+    <div class="box">
+      <div class="kick rv">Duality</div>
+      <h2 class="rv d1">Duality.</h2>
+      <p class="rv d2">Engineering a dual-based spray-forming system creates an atom structure that ensures components are compatible and can be machined and printed together without problems.</p>
+      <p class="rv d2">Since both, the steel billet and the metal powder are simultaneously created in the same production process, both materials are chemically identical.</p>
+      <p class="rv d2 fine2">This enables superb compatibility, e.g., for hybrid additive manufacturing (machined steel + powder), laser cladding (part to be repaired + powder), or powder metallurgical applications (welded shell + powder).</p>
+      <div class="chem rv d3">
+        <div class="ttl">ODIN44 = THOR44 · 440C | 1.4125</div>
+        <table><tr><th>C</th><th>Cr</th><th>Mo</th><th>Si</th><th>Mn</th></tr><tr><td>0.95-1.2</td><td>16-18</td><td>&lt;0.75</td><td>&lt;1</td><td>&lt;1</td></tr></table>
+      </div>
+      <div class="legend rv d4"><span><i class="sw-rust"></i>Scrap</span><span><i class="sw-hot"></i>Spray Forming</span><span><i class="sw-steel"></i>ODIN · billet</span><span><i class="sw-powder"></i>THOR · powder</span></div>
+    </div>
+    <div class="olab" data-o="0"><b>ODIN44</b><span>Tool steel billet</span></div>
+    <div class="olab" data-o="1"><b>THOR44</b><span>Metal powder</span></div>
+  </section>
+
+  <!-- 5 -->
+  <section class="am am-macro" data-stage="5">
+    <div class="box">
+      <div class="kick rv">High-End Quality</div>
+      <h2 class="rv d1">Premium quality steel and powders</h2>
+      <p class="rv d2">Like powder metallurgical steel, spray-formed steel is characterized by a fine-grained and homogenous microstructure without segregation, making it a steel product of premium quality.</p>
+      <div class="grain rv d3">
+        <div class="ends"><span>Spray formed</span><span>Conventional cast</span></div>
+        <input id="am-grain" type="range" min="0" max="1" step="0.001" value="0" aria-label="Compare spray formed and conventional cast microstructure">
+        <small>Schematic microstructure</small>
+      </div>
+      <dl class="spec rv d4">
+        <dt>Steel</dt><dd>Extremely homogenous microstructure, finely dispersed small carbides</dd>
+        <dt>Powder</dt><dd>Excellent sphericity, flowability, and high density</dd>
+        <dt>Qualified</dt><dd>For 3D metal printing, in a research project with the Technical University of Denmark</dd>
+        <dt>Impact</dt><dd>Exceptional low CO2 impact</dd>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="am am-loop" id="sustainability" data-stage="6">
+    <div class="top">
+      <div class="kick rv">Step 3 · One-to-one delivery</div>
+      <div class="big rv d1">1<em>:</em>1</div>
+      <p class="rv d2">Get your materials back in a certified ready-to-use condition. After the end of life, we are glad to repeat the process. We can guarantee to return your scrap metal in 1:1 volume with the same or higher quality than what was provided.</p>
+      <div class="stats rv d3">
+        <div><b>~100%</b><span>material efficiency, thanks to our closed-loop circular approach</span></div>
+        <div><b>98-100%</b><span>made from scrap steel</span></div>
+        <div><b>100%</b><span>renewable energy in production</span></div>
+      </div>
+    </div>
+    <div class="pillars">
+      <div class="rv"><i>Circular</i><b>Upgradable.</b><p>Upgrading the quality in the process means our material last longer.</p></div>
+      <div class="rv d1"><i>Clean</i><b>Using 100% green energy.</b><p>We only use electricity to operate the oven, and all electricity is made from green renewable energy sources like wind and solar power.</p></div>
+      <div class="rv d2"><i>Local</i><b>Local supply chains.</b><p>We aim to provide work for local talent and economic uplift for communities through local micro-factories reducing transportation of scrap metal.</p></div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="am am-prod" id="products" data-stage="7">
+    <div class="top">
+      <div class="kick rv">Products</div>
+      <h2 class="rv d1">Products</h2>
+      <p class="rv d2">Our steel is 98-100% made from scrap steel, sometimes we add 1-2% virgin material such as chrome, and we use 100% renewable energy sources for our production.</p>
+    </div>
+    <div class="prods">
+      <a class="prod rv" data-p="0" data-word="ODIN44" href="https://asgaardmetals.com/amproduct/odin44-2/"><span class="t">ODIN44<small>440C | 1.4125</small></span><span class="d"><em>Tool Steel</em>A premium high-carbon martensitic stainless tool steel made by Spray Forming with exceptional wear resistance and toughness.</span><span class="a">↗</span></a>
+      <a class="prod rv d1" data-p="1" data-word="THOR13" href="https://asgaardmetals.com/amproduct/thor13/"><span class="t">THOR13<small>H13 | 1.2344</small></span><span class="d"><em>Metal Powder</em>A versatile, high-performance hot work tool steel renowned for its exceptional thermal resistance, toughness, and wear properties.</span><span class="a">↗</span></a>
+      <a class="prod rv d2" data-p="2" data-word="THOR15" href="https://asgaardmetals.com/amproduct/thor15/"><span class="t">THOR15<small>T15 | 1.3202</small></span><span class="d"><em>Metal Powder</em>A high-performance tungsten type high-speed tool steel for Binder Jetting.</span><span class="a">↗</span></a>
+      <a class="prod rv d3" data-p="3" data-word="THOR44" href="https://asgaardmetals.com/amproduct/thor44/"><span class="t">THOR44<small>440C | 1.4125</small></span><span class="d"><em>Metal Powder</em>ODIN44 as powder, for Additive Manufacturing, Hot-Isostatic-Pressing and cored-wire applications.</span><span class="a">↗</span></a>
+    </div>
+    <a class="lnk sheet rv" href="https://asgaardmetals.com/wp-content/uploads/2024/06/ODIN44-data-sheet-v24.06.pdf">Download Data Sheet ↗</a>
+  </section>
+
+  <!-- 8 -->
+  <section class="am am-end" id="contact" data-stage="8">
+    <div class="big">
+      <div class="kick rv">Contact</div>
+      <h2 class="rv d1">Get in touch!</h2>
+      <p class="sub rv d2">We are a Danish re-cycling metal company, producing high-end tool steel and metal powder for 3D Printing.</p>
+      <a class="mail rv d2" href="mailto:info@asgaardmetals.com">info@asgaardmetals.com</a><br>
+      <a class="btn rv d3" href="tel:+4553652888">+45 5365 2888 <span>↗</span></a>
+      <div class="people rv d4">
+        <div><b>Jan Sørensen</b><span>CEO</span></div>
+        <div><b>Thomas Dahmen, Ph.D.</b><span>Head of Technology<br><a href="mailto:tdah@asgaardmetals.com">tdah@asgaardmetals.com</a></span></div>
+        <div><b>Industrivej 25</b><span>3300 Frederiksværk<br>Denmark</span></div>
+      </div>
+    </div>
+    <div class="foot"><span>Asgaard Metals ApS · VAT 28144059</span><span><a href="mailto:career@asgaardmetals.com">Careers</a> · <a href="mailto:press@asgaardmetals.com">Press</a> · <a href="https://www.linkedin.com/company/nordic-metals/">LinkedIn ↗</a></span></div>
+  </section>
+</main>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const mix = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const ease = (t) => { t = clamp(t); return t * t * t * (t * (t * 6 - 15) + 10); };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+// ---- HERO VARIANT ------------------------------------------------------------------------------------------
+// 'ring'    = the hero opens top-down on the mark (glowing billet top = the dot, ember ring with its gap = the ring);
+//             scrolling to "Our Story" swings the camera down and the column appears with the stream pouring in.
+// 'classic' = the original hero (the stream and spray cone in front of ASGAARD on the wall).
+// Revert: set HERO_VARIANT = 'classic' below, or open the page with ?hero=classic
+const HERO_VARIANT = 'ring';
+const HERO_SPK = typeof window.__SPK === 'number' ? window.__SPK : 0.3;    // spark size in the zoomed ring hero, relative to world-true size
+const HERO_RING = (new URLSearchParams(location.search).get('hero') || window.__HERO || HERO_VARIANT) === 'ring';
+
+// ---------- reveal ----------
+const io = new IntersectionObserver((es) => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }),
+  { threshold: 0.15, rootMargin: '0px 0px -6% 0px' });
+$$('.rv').forEach(el => io.observe(el));
+const markReady = () => document.body.classList.add('ready');
+
+// ---------- WebGL2 ----------
+const canvas = $('#gl');
+let gl2 = null;
+try { gl2 = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' }); } catch (e) {}
+if (!gl2) { document.body.classList.add('nogl'); canvas.style.display = 'none'; markReady(); $$('.rv').forEach(e => e.classList.add('in')); throw new Error('no webgl2'); }
+
+const renderer = new THREE.WebGLRenderer({ canvas, context: gl2, antialias: false });
+const MOBILE = matchMedia('(max-width: 860px)').matches || /Mobi|Android/i.test(navigator.userAgent);
+const NARROW = innerWidth / innerHeight < 0.85;
+const HERO_ZOOM = HERO_RING && !(MOBILE || NARROW);   // zoomed ring hero (upper arc only) is landscape-only; portrait keeps the whole mark above the text stack
+let quality = MOBILE ? 0.62 : Math.min(devicePixelRatio, 1.25);
+renderer.setPixelRatio(quality);
+renderer.setSize(innerWidth, innerHeight, false);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+// ---------- scene constants ----------
+const FLOOR_Y = -1.35, R_B = 0.46, Y_B = -1.0, Y_NOZ = 2.35, Y_ATOM = 1.25;
+const NSCR = 4, NHEAT = 8;
+
+const U = {
+  uRes: { value: new THREE.Vector2() },
+  uCamPos: { value: new THREE.Vector3() }, uCamRot: { value: new THREE.Matrix3() }, uTanF: { value: 0.27 },
+  uTime: { value: 0 },
+  uBil: { value: new THREE.Vector4(0, Y_B, 0, R_B) }, uBilH: { value: 1.3 }, uSpin: { value: 0 },
+  uMS: { value: MOBILE ? 0.55 : 1 }, uTint: { value: 0 }, uPed: { value: 1 }, uHot: { value: 1 }, uCut: { value: 0.7 }, uGrain: { value: 0 }, uRough: { value: 1 }, uDep: { value: 1 },
+  uStr: { value: new THREE.Vector4(0, Y_NOZ, Y_ATOM, 0.034) }, uNoz: { value: 0 },
+  uMound: { value: new THREE.Vector4(1.55, 0.2, 0.2, 0.45) },
+  uScr: { value: Array.from({ length: NSCR }, () => new THREE.Vector4()) },
+  uScrR: { value: Array.from({ length: NSCR }, () => new THREE.Matrix3()) },
+  uScrT: { value: [0, 3, 1, 2] },
+  uHeat: { value: Array.from({ length: NHEAT }, () => new THREE.Vector4(0, 0, 0, -1)) }, uHeatA: { value: new Array(NHEAT).fill(0) },
+  uDent: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uGlowA: { value: new THREE.Vector4(0, Y_ATOM, 0, 0) }, uGlowB: { value: new THREE.Vector4(0, 0.3, 0, 0) },
+  uGlowCol: { value: new THREE.Color(1.0, 0.42, 0.1) },
+  uSB: { value: new THREE.Vector4(0, 0, 0, 2.4) },
+  uPaper: { value: new THREE.Color() }, uInk: { value: new THREE.Color(1, 1, 1) }, uInkGlow: { value: 0 },
+  uKey: { value: 1 }, uDark: { value: 0 }, uHaze: { value: 0 }, uFlag: { value: 0 },
+  uText: { value: null }, uTextRect: { value: new THREE.Vector4(-3, -0.5, 3, 2.5) }, uTextA: { value: 1 },
+};
+
+const FS = /* glsl */`
+precision highp float;
+uniform vec2 uRes; uniform vec3 uCamPos; uniform mat3 uCamRot; uniform float uTanF, uTime;
+uniform vec4 uBil; uniform float uBilH, uSpin, uHot, uCut, uGrain, uRough, uDep, uMS, uTint, uPed;
+uniform vec4 uStr; uniform float uNoz;
+uniform vec4 uMound;
+uniform vec4 uScr[${NSCR}]; uniform mat3 uScrR[${NSCR}]; uniform float uScrT[${NSCR}];
+uniform vec4 uHeat[${NHEAT}]; uniform float uHeatA[${NHEAT}]; uniform vec4 uDent;
+uniform vec4 uGlowA, uGlowB, uSB; uniform vec3 uGlowCol;
+uniform float uKey, uDark, uTextA, uInkGlow, uHaze, uFlag;
+uniform vec3 uPaper, uInk; uniform sampler2D uText; uniform vec4 uTextRect;
+
+const float FLOOR = ${FLOOR_Y.toFixed(3)}, WALLZ = -2.6, RC = 0.9;
+const vec3 LDIR = vec3(-0.2873, 0.8209, 0.4925);
+float gLod = 0.0, gHaze = 0.0, gId = 0.0;
+
+float hash1(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+// screen-space jitter: sin-hashes on pixel coordinates lose precision and paint stripes, IGN does not
+float ign(vec2 p){ return fract(52.9829189*fract(dot(p, vec2(0.06711056, 0.00583715)))); }
+vec2 hash2(vec2 p){ return fract(sin(vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))))*43758.5453); }
+float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+  return mix(mix(hash1(i), hash1(i + vec2(1.0, 0.0)), f.x), mix(hash1(i + vec2(0.0, 1.0)), hash1(i + vec2(1.0, 1.0)), f.x), f.y); }
+// incandescence: dark red -> orange -> yellow -> white
+vec3 bb(float t){ t = clamp(t, 0.0, 1.3); return vec3(1.0, 0.30 + 0.70*t*t, 0.05 + 0.95*t*t*t*t)*pow(t, 2.4)*10.0; }
+
+float smin(float a, float b, float k){ float h = max(k - abs(a - b), 0.0)/k; return min(a, b) - h*h*k*0.25; }
+float sdCapCyl(vec3 p, float r, float h){ vec2 d = vec2(length(p.xz) - r, abs(p.y) - h); return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); }
+float sdRoundBox(vec3 p, vec3 b, float r){ vec3 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r; }
+float sdTorus(vec3 p, vec2 t){ vec2 q = vec2(length(p.xz) - t.x, p.y); return length(q) - t.y; }
+float nz3(vec3 p){ return (vnoise(p.xy) + vnoise(p.yz + 3.1) + vnoise(p.zx + 7.3))/3.0; }
+float sdEll(vec3 p, vec3 r){ float k0 = length(p/r), k1 = length(p/(r*r)); return k0*(k0 - 1.0)/k1; }
+float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){   // iq
+  vec3 ba = b - a; float l2 = dot(ba, ba); float rr = r1 - r2; float a2 = l2 - rr*rr; float il2 = 1.0/l2;
+  vec3 pa = p - a; float y = dot(pa, ba); float z = y - l2;
+  vec3 xv = pa*l2 - ba*y; float x2 = dot(xv, xv); float y2 = y*y*l2; float z2 = z*z*l2;
+  float k = sign(rr)*rr*rr*x2;
+  if (sign(z)*a2*z2 > k) return sqrt(x2 + z2)*il2 - r2;
+  if (sign(y)*a2*y2 < k) return sqrt(x2 + y2)*il2 - r1;
+  return (sqrt(x2*a2*il2) + y*rr)*il2 - r1;
+}
+float scrapD(vec3 l, float s, int T){
+  if (T == 0) return sdRoundBox(l, vec3(s, s*0.24, s*0.3), s*0.05);                 // bar offcut
+  if (T == 1) return sdTorus(l, vec2(s*0.55, s*0.17));                               // bearing ring
+  if (T == 3){                                                                       // worn gear
+    float rr = length(l.xz), an = atan(l.z, l.x);
+    float teeth = clamp(sin(an*14.0)*1.8, -1.0, 1.0)*s*0.045;
+    float disc = max(rr - (s*0.47 + teeth), abs(l.y) - s*0.09);
+    return max(disc, -(rr - s*0.13))*0.5;
+  }
+  float an = atan(l.z, l.x);                                                         // drill, axis y
+  float fl = sdCapCyl(l - vec3(0.0, s*0.2, 0.0), s*0.13, s*0.42) + (0.5 + 0.5*sin(an*2.0 + l.y*11.0/s))*s*0.03*step(-s*0.2, l.y);
+  float shank = sdCapCyl(l - vec3(0.0, -s*0.45, 0.0), s*0.115, s*0.25);
+  float tip = sdRoundCone(l, vec3(0.0, s*0.6, 0.0), vec3(0.0, s*0.8, 0.0), s*0.13, s*0.015);
+  return min(min(fl*0.75, shank), tip);
+}
+
+float map(vec3 p){
+  float d = 1e3; gId = 0.0;
+  // turntable + billet
+  vec3 q = p - uBil.xyz; float R = uBil.w;
+  float yy = clamp(q.y, FLOOR - uBil.y, uBilH + 0.05);
+  float bd = length(vec3(q.x, q.y - yy, q.z)) - 0.72;
+  if (bd > 0.25) d = bd;
+  else {
+    float hp = (-0.06 - (FLOOR - uBil.y))*0.5;
+    float sink = (1.0 - uPed)*0.62;                    // ring hero: the turntable waits below the floor
+    float ped = sdCapCyl(q - vec3(0.0, -0.06 - hp - sink, 0.0), 0.6, hp - 0.02) - 0.02;
+    float sub = sdCapCyl(q - vec3(0.0, -0.03 - sink, 0.0), R*1.2, 0.022) - 0.008;
+    d = min(ped, sub); gId = 2.0;
+    if (uBilH > 0.01){
+      float capH = min(R*0.5, uBilH), hb = uBilH - capH;
+      vec2 w = vec2(length(q.xz) - R, abs(q.y - hb*0.5) - hb*0.5);
+      float cyl = hb > 0.002 ? min(max(w.x, w.y), 0.0) + length(max(w, 0.0)) : 1e3;
+      float cap = sdEll(q - vec3(0.0, hb, 0.0), vec3(R, capH, R));
+      float db = smin(cyl, cap, 0.06);
+      float a = atan(q.z, q.x) + uSpin;
+      float cz = q.z - uCut;
+      float dbc = max(db, cz);
+      if (dbc < d){ d = dbc; gId = cz > db ? 3.0 : 1.0; }
+    }
+  }
+  // the melt stream + ceramic nozzle
+  if (uNoz > 0.001){
+    vec3 nq = p - vec3(uStr.x, uStr.y + 0.34, 0.0);
+    float nb = length(nq) - 0.5;
+    if (nb > 0.2){ if (nb < d){ d = nb; gId = 0.0; } }
+    else { float nz = sdCapCyl(nq, 0.12, 0.34) - 0.012; if (nz < d){ d = nz; gId = 2.0; } }
+  }
+  if (uStr.w > 0.001){
+    vec3 a = vec3(uStr.x, uStr.y, 0.0), b = vec3(uStr.x, uStr.z, 0.0);
+    float sb = length(vec2(p.x - uStr.x, p.z)) - 0.25;
+    float sy = max(max(uStr.z - p.y, p.y - uStr.y), 0.0);
+    float sbd = max(sb, sy);
+    if (sbd > 0.15){ if (sbd < d){ d = sbd; gId = 0.0; } }
+    else {
+      float st = sdRoundCone(p, a, b, uStr.w, uStr.w*0.72) + sin(p.y*9.0 + uTime*14.0)*0.003 + sin(p.y*23.0 - uTime*19.0 + p.x*40.0)*0.0022;
+      if (st < d){ d = st; gId = 5.0; }
+    }
+  }
+  // powder heap
+  if (uMound.z > 0.01){
+    vec3 m = p - vec3(uMound.x, FLOOR, uMound.y);
+    float mb = length(m) - max(uMound.w*1.6, uMound.z) - 0.05;
+    if (mb > 0.2){ if (mb < d){ d = mb; gId = 0.0; } }
+    else {
+      float r2 = dot(m.xz, m.xz)/(uMound.w*uMound.w);
+      float hh = uMound.z*max(exp(-r2*2.2) - 0.0036, 0.0)/0.9964;
+      float dm = max((m.y - hh)*0.5, length(m.xz) - uMound.w*1.6);
+      if (dm < d){ d = dm; gId = 4.0; }
+    }
+  }
+  // scrap
+  for (int i = 0; i < ${NSCR}; i++){
+    vec4 S = uScr[i]; if (S.w <= 0.001) continue;
+    vec3 o = p - S.xyz; float bs = length(o) - S.w*1.2;
+    if (bs > d) continue;
+    if (bs > 0.2){ d = bs; gId = 0.0; continue; }
+    float ds = scrapD(uScrR[i]*o, S.w, int(uScrT[i] + 0.5));
+    if (ds < d){ d = ds; gId = 6.0; }
+  }
+  return d;
+}
+vec3 calcN(vec3 p){
+  const vec2 e = vec2(1.0, -1.0)*0.0015;
+  return normalize(e.xyy*map(p + e.xyy) + e.yyx*map(p + e.yyx) + e.yxy*map(p + e.yxy) + e.xxx*map(p + e.xxx));
+}
+
+float softShadow(vec3 ro, vec3 rd){
+  vec3 oc = ro - uSB.xyz; float b = dot(oc, rd), c = dot(oc, oc) - uSB.w*uSB.w, h = b*b - c;
+  if (h <= 0.0) return 1.0;
+  float sq = sqrt(h), tE = -b + sq; if (tE < 0.0) return 1.0;
+  float res = 1.0, t = max(-b - sq, 0.02) + ign(gl_FragCoord.xy + fract(uTime*5.0)*29.0)*0.03;
+  for (int i = 0; i < 30; i++){
+    float d = map(ro + rd*t);
+    if (gId > 4.5 && gId < 5.5) d = max(d, 0.05);   // the glowing stream casts no shadow
+    if (gId > 3.5 && gId < 4.5) d = max(d, 0.03);   // the heap's bound-ish SDF rings in penumbrae
+    res = min(res, 8.0*max(d, 0.0)/t); if (res < 0.01) break;
+    t += clamp(d, 0.015, 0.22); if (t > tE) break;
+  }
+  res = clamp(res, 0.0, 1.0);
+  return res*res*(3.0 - 2.0*res);
+}
+vec3 glowLight(vec3 P, vec3 N){
+  vec3 c = vec3(0.0);
+  vec3 L = uGlowA.xyz - P; float d2 = dot(L, L);
+  c += uGlowCol*uGlowA.w*max(dot(N, L*inversesqrt(d2)), 0.0)/(1.0 + d2*1.3);
+  L = uGlowB.xyz - P; d2 = dot(L, L);
+  c += uGlowCol*uGlowB.w*max(dot(N, L*inversesqrt(d2))*0.85 + 0.15, 0.0)/(1.0 + d2*1.7);
+  return c;
+}
+
+// seamless cyclorama: floor + curved sweep + wall
+float cycHit(vec3 ro, vec3 rd, out vec3 N){
+  float tb = 1e5; N = vec3(0.0, 1.0, 0.0);
+  float yc = FLOOR + RC, zc = WALLZ + RC;
+  if (rd.y < 0.0){ float t = (FLOOR - ro.y)/rd.y; vec3 P = ro + rd*t; if (t > 0.0 && P.z >= zc){ tb = t; N = vec3(0.0, 1.0, 0.0); } }
+  if (rd.z < 0.0){ float t = (WALLZ - ro.z)/rd.z; vec3 P = ro + rd*t; if (t > 0.0 && t < tb && P.y >= yc){ tb = t; N = vec3(0.0, 0.0, 1.0); } }
+  vec2 o = ro.yz - vec2(yc, zc), d = rd.yz; float a = dot(d, d);
+  if (a > 1e-6){
+    float b = dot(o, d), c = dot(o, o) - RC*RC, h = b*b - a*c;
+    if (h > 0.0){ float t = (-b + sqrt(h))/a; vec3 P = ro + rd*t;
+      if (t > 0.0 && t < tb && P.y < yc && P.z < zc){ tb = t; N = normalize(vec3(0.0, yc - P.y, zc - P.z)); } }
+  }
+  return tb;
+}
+// blurred reflections of the emitters (for the polished concrete floor)
+vec3 emitSoft(vec3 ro, vec3 rd){
+  vec3 c = vec3(0.0);
+  vec2 o = ro.xz - vec2(uStr.x, 0.0), d = rd.xz; float a = dot(d, d);
+  if (a > 1e-5){
+    float t = -dot(o, d)/a; vec3 P = ro + rd*t; float dd = length(P.xz - vec2(uStr.x, 0.0));
+    if (t > 0.0){
+      if (uStr.w > 0.001 && P.y < uStr.y && P.y > uStr.z) c += bb(0.66)*exp(-dd*dd/0.01)*0.45;
+      float yb = uBil.y, yt = uBil.y + uBilH;
+      if (uHot > 0.01 && P.y > yb && P.y < yt + 0.1) c += uGlowCol*uHot*1.5*exp(-dd*dd/(uBil.w*uBil.w*1.2))*smoothstep(yb, yt, P.y)*smoothstep(yt + 0.1, yt - 0.1, P.y);
+    }
+  }
+  if (uGlowA.w > 0.0){ vec3 oc = uGlowA.xyz - ro; float b = dot(oc, rd); if (b > 0.0){ float cc = dot(oc, oc) - b*b; c += uGlowCol*uGlowA.w*0.35*exp(-cc*3.0); } }
+  return c;
+}
+vec3 cycShade(vec3 P, vec3 N, vec3 V){
+  float lam = max(dot(N, LDIR), 0.0);
+  vec3 sp = P - vec3(0.0, -0.9, -1.4);
+  float spot = exp(-dot(sp, sp)*0.05);
+  float fall = exp(-max(P.y - 0.4, 0.0)*0.32)*exp(-max(P.z - 3.0, 0.0)*0.12)*exp(-max(abs(P.x) - 3.5, 0.0)*0.22);
+  float irr = (0.16 + 0.55*lam + 0.85*spot)*fall; irr = irr/(1.0 + max(irr - 0.9, 0.0)*0.6);
+  float sh = softShadow(P + N*0.01, LDIR);
+  float ao = 1.0;
+  { vec3 q = P - uBil.xyz; float rr = length(q.xz); ao *= 1.0 - 0.5*exp(-max(rr - 0.6, 0.0)*7.0)*smoothstep(0.4, 0.0, P.y - FLOOR); }
+  for (int i = 0; i < ${NSCR}; i++){ vec4 S = uScr[i]; if (S.w <= 0.001) continue;
+    float rr = length(P.xz - S.xz); ao *= 1.0 - 0.45*exp(-max(rr - S.w*0.45, 0.0)*9.0)*smoothstep(S.w*1.4, 0.0, S.y - FLOOR)*step(0.5, N.y); }
+  if (uMound.z > 0.01){ float rr = length(P.xz - vec2(uMound.x, uMound.y)); ao *= 1.0 - 0.3*exp(-max(rr - uMound.w*1.1, 0.0)*5.0)*step(0.5, N.y); }
+  vec3 alb = uPaper; float ink = 0.0;
+  float con = vnoise(P.xz*2.1)*0.5 + vnoise(P.xz*8.0 + 3.0)*0.3 + vnoise(P.xz*33.0)*0.2;
+  alb *= mix(1.0, 0.8 + 0.4*con, step(0.5, N.y)*(1.0 - uFlag*0.75));
+  {   // print on the wall; hot air in front of it makes it shimmer
+    vec2 hz = (vec2(vnoise(P.xy*3.2 + vec2(0.0, -uTime*1.7)), vnoise(P.xy*3.2 + vec2(5.2, -uTime*2.1))) - 0.5)*gHaze*0.035;
+    vec2 tuv = (P.xy - uTextRect.xy)/(uTextRect.zw - uTextRect.xy) + hz;
+    float foot = length(P - uCamPos)*2.0*uTanF/uRes.y;
+    float lod = log2(max(foot*2048.0/(uTextRect.z - uTextRect.x), 1.0)) + gLod + gHaze*1.2;
+    vec4 tx = textureLod(uText, clamp(tuv, 0.0, 1.0), lod);
+    float inside = step(0.0, tuv.x)*step(0.0, tuv.y)*step(tuv.x, 1.0)*step(tuv.y, 1.0)*step(0.5, N.z)*uTextA;
+    ink = tx.a*inside; alb = alb*(1.0 - ink) + tx.rgb*uInk*inside;
+  }
+  vec3 galb = mix(alb, vec3(0.1, 0.095, 0.09) + alb*0.5, 0.6);
+  vec3 col = alb*irr*uKey*mix(0.3, 1.0, sh)*ao + galb*glowLight(P, N)*ao + uInk*ink*uInkGlow;
+  if (N.y > 0.5){                                // polished concrete: the glow smears across the floor
+    float gloss = (0.3 + 0.7*smoothstep(0.3, 0.8, vnoise(P.xz*1.3 + 11.0)))*(1.0 - uFlag*0.8);
+    gloss *= 0.08 + 0.92*pow(1.0 - clamp(-dot(V, N), 0.0, 1.0), 3.0);   // fresnel: the floor mirrors only at grazing angles
+    col += emitSoft(P, reflect(V, N))*gloss*ao;
+  }
+  return col;
+}
+// studio lights: only visible in reflections (like on a real set)
+float rectM(vec2 q, vec4 r, float soft){ return smoothstep(0.0, soft, min(min(q.x - r.x, r.z - q.x), min(q.y - r.y, r.w - q.y))); }
+vec3 softbox(vec3 ro, vec3 rd, float tMax){
+  vec3 c = vec3(0.0);
+  float k = max(uKey, 0.3);
+  float kTop = mix(14.0, 1.2, uDark)*k, kSide = mix(7.0, 1.5, uDark)*k, kRim = mix(6.0, 5.0, uDark);
+  if (rd.y > 0.0){ float t = (4.6 - ro.y)/rd.y; if (t < tMax){ vec2 q = (ro + rd*t).xz; c += vec3(1.0, 0.985, 0.96)*kTop*rectM(q, vec4(-2.8, -1.2, 1.3, 2.4), 0.25); } }
+  if (rd.x < 0.0){ float t = (-4.4 - ro.x)/rd.x; if (t < tMax){ vec2 q = (ro + rd*t).zy; c += vec3(1.0)*kSide*rectM(q, vec4(-0.6, -0.8, 2.6, 3.4), 0.12); } }
+  if (rd.x > 0.0){ float t = (4.4 - ro.x)/rd.x; if (t < tMax){ vec2 q = (ro + rd*t).zy; c += vec3(0.86, 0.93, 1.0)*kRim*rectM(q, vec4(-2.3, -0.9, -0.5, 3.2), 0.1); } }
+  if (rd.z > 0.0){ float t = (7.5 - ro.z)/rd.z; if (t < tMax){ vec2 q = (ro + rd*t).xy;
+    float strips = rectM(q, vec4(-3.5, -0.6, -2.0, 3.2), 0.3) + rectM(q, vec4(2.0, -0.6, 3.5, 3.2), 0.3);
+    c += vec3(1.0)*(1.0 - uDark)*k*mix(0.9*rectM(q, vec4(-4.0, -1.0, 4.0, 3.5), 0.8), 2.4*strips, uFlag); } }
+  return c;
+}
+// emitters seen in reflections: the stream as a hot line, the atomisation zone as a glowing ball
+vec3 emitSeen(vec3 ro, vec3 rd, float tMax){
+  vec3 c = vec3(0.0);
+  if (uStr.w > 0.001){
+    vec2 o = ro.xz - vec2(uStr.x, 0.0), d = rd.xz; float a = dot(d, d);
+    if (a > 1e-5){ float t = -dot(o, d)/a; vec3 P = ro + rd*t;
+      if (t > 0.0 && t < tMax && P.y < uStr.y && P.y > uStr.z){ float dd = length(P.xz - vec2(uStr.x, 0.0)); c += bb(0.7)*exp(-dd*dd/0.0025)*0.5; } }
+  }
+  if (uGlowA.w > 0.0){ vec3 oc = uGlowA.xyz - ro; float b = dot(oc, rd); if (b > 0.0 && b < tMax){ float cc = dot(oc, oc) - b*b; c += uGlowCol*uGlowA.w*0.5*exp(-cc*12.0); } }
+  return c;
+}
+vec3 envFull(vec3 ro, vec3 rd){
+  vec3 N; float t = cycHit(ro, rd, N);
+  vec3 c = t < 1e4 ? cycShade(ro + rd*t, N, rd) : uPaper*0.05*uKey;
+  c += softbox(ro, rd, t) + emitSeen(ro, rd, t);
+  if (uFlag > 0.001 && abs(rd.x) > 1e-3){      // black flags left and right of the set: steel needs something dark to reflect
+    float tf = (sign(rd.x)*2.6 - ro.x)/rd.x;
+    if (tf > 0.0 && tf < t){ vec3 P = ro + rd*tf; float m = rectM(P.zy, vec4(-1.6, -1.2, 2.2, 2.6), 0.5); c = mix(c, c*0.06, m*uFlag); }
+  }
+  return c;
+}
+
+// ---- the billet's skin: 3D noise in the billet's own (rotating) frame, no atan seams, no grid blobs
+float hash13(vec3 p3){ p3 = fract(p3*0.1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y)*p3.z); }
+float vn3(vec3 x){
+  vec3 i = floor(x), f = fract(x); f = f*f*f*(f*(f*6.0 - 15.0) + 10.0);
+  return mix(mix(mix(hash13(i), hash13(i + vec3(1.0, 0.0, 0.0)), f.x), mix(hash13(i + vec3(0.0, 1.0, 0.0)), hash13(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+             mix(mix(hash13(i + vec3(0.0, 0.0, 1.0)), hash13(i + vec3(1.0, 0.0, 1.0)), f.x), mix(hash13(i + vec3(0.0, 1.0, 1.0)), hash13(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+}
+const mat3 ROT3 = mat3(0.00, 0.80, 0.60, -0.80, 0.36, -0.48, -0.60, -0.48, 0.64);
+float fbm3(vec3 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++){ s += a*vn3(p); p = ROT3*p*2.03; a *= 0.5; } return s/0.9375; }
+vec3 bilObj(vec3 p){ vec3 q = p - uBil.xyz; float c = cos(uSpin), sn = sin(uSpin); return vec3(c*q.x - sn*q.z, q.y, sn*q.x + c*q.z); }
+// x = fine deposit grain (cauliflower), y = broad temperature variation, z = thin oxide crackle
+vec3 bilSurf(vec3 ob){
+  float fine = fbm3(ob*38.0);
+  float broad = fbm3(ob*4.5 + 11.0);
+  float rn = 1.0 - abs(2.0*vn3(ob*15.0 + 3.0) - 1.0);
+  float rn2 = 1.0 - abs(2.0*vn3(ROT3*ob*31.0 + 7.0) - 1.0);
+  return vec3(fine, broad, clamp(pow(rn, 12.0) + 0.55*pow(rn2, 16.0), 0.0, 1.0));
+}
+float billetT(vec3 p, vec3 sf){
+  vec3 q = p - uBil.xyz;
+  float grad = smoothstep(uBilH - 1.15, uBilH, q.y);
+  float t = uHot*0.4*(0.13 + 0.87*grad);
+  float wtop = smoothstep(uBilH - 0.3, uBilH - 0.05, q.y);
+  t *= (0.88 + 0.24*sf.y)*(0.9 + 0.18*sf.x);
+  t *= mix(1.0, 1.05 - 0.2*dot(q.xz, q.xz)/(uBil.w*uBil.w), wtop);                  // fresh deposit on top: smooth and brightest in the middle
+  float cool = (1.0 - 0.65*grad)*(1.0 - 0.6*uDep)*(1.0 - wtop);
+  t *= 1.0 - 0.5*sf.z*cool*smoothstep(0.03, 0.12, t);                               // scale cracks read as dark lines on the glow
+  t += uDep*0.12*exp(-dot(q.xz, q.xz)*6.0)*wtop;
+  t += uDep*0.16*step(0.955, hash13(floor(bilObj(p)*70.0) + floor(uTime*14.0)*17.0))*smoothstep(uBilH - 0.28, uBilH, q.y);   // droplets landing
+  for (int i = 0; i < ${NHEAT}; i++){ float age = uHeat[i].w; if (age < 0.0) continue; vec3 dq = p - uHeat[i].xyz; t += uHeatA[i]*exp(-age*1.25)*exp(-dot(dq, dq)*150.0); }
+  vec3 dd = p - uDent.xyz; t += uDent.w*exp(-dot(dd, dd)*260.0);
+  return t;
+}
+// etched microstructure on the cut face: fine equiaxed grains + dispersed carbides <-> coarse cast grains + segregated carbide network
+vec3 voro(vec2 x){
+  vec2 n = floor(x), f = fract(x); float m1 = 8.0, m2 = 8.0; vec2 id = vec2(0.0);
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++){
+    vec2 g = vec2(float(i), float(j)); vec2 o = hash2(n + g); vec2 r = g + o - f; float d = dot(r, r);
+    if (d < m1){ m2 = m1; m1 = d; id = n + g; } else if (d < m2) m2 = d;
+  }
+  return vec3(sqrt(m2) - sqrt(m1), hash1(id), 0.0);
+}
+vec3 micro(vec2 uv){
+  vec3 vf = voro(uv*120.0);
+  float fine = 0.34 + vf.y*0.12;
+  fine *= mix(0.12, 1.0, smoothstep(0.015, 0.09, vf.x));
+  vec2 cg = floor(uv*360.0); vec2 cf = fract(uv*360.0) - 0.5 + (hash2(cg) - 0.5)*0.5;
+  float carb = step(0.55, hash1(cg + 3.1))*smoothstep(0.2, 0.1, length(cf));
+  fine = mix(fine, 0.8, carb);
+  vec3 vc = voro(uv*16.0 + vec2(vnoise(uv*9.0), vnoise(uv*9.0 + 4.0))*0.6);
+  float band = 0.5 + 0.5*sin(uv.y*55.0 + vnoise(uv*6.0)*4.0);
+  float cst = 0.3 + vc.y*0.18 - band*0.08;
+  float net = smoothstep(0.1, 0.02, vc.x);
+  cst = mix(cst, 0.78, net*0.85);
+  vec2 ru = mat2(0.83, -0.56, 0.56, 0.83)*uv*38.0;
+  vec2 bg = floor(ru); vec2 bf = fract(ru) - 0.5 - (hash2(bg + 2.0) - 0.5)*0.4;
+  float ang = hash1(bg + 5.0)*3.14; bf = mat2(cos(ang), -sin(ang), sin(ang), cos(ang))*bf;
+  float blk = step(0.78, hash1(bg + 9.0))*smoothstep(0.02, 0.0, max(abs(bf.x)*1.6, abs(bf.y)) - 0.1 - 0.08*hash1(bg));
+  cst = mix(cst, 0.85, blk);
+  float g = mix(fine, cst, uGrain);
+  return vec3(g)*vec3(0.98, 0.99, 1.02);
+}
+vec3 shadeObj(vec3 ro, vec3 rd, vec3 p, float id){
+  if (id > 4.5 && id < 5.5){                           // the stream: pure incandescence
+    vec3 n = calcN(p); float c = clamp(-dot(rd, n), 0.0, 1.0);
+    float an = atan(p.z, p.x - uStr.x);
+    float flow = vnoise(vec2(an*2.0, p.y*15.0 + uTime*20.0))*0.6 + vnoise(vec2(an*5.0, p.y*46.0 + uTime*31.0))*0.4;
+    return bb(0.6 + 0.15*flow)*(0.6 + 0.4*pow(c, 0.7)) + bb(0.9)*0.08*pow(c, 8.0)*flow;
+  }
+  vec3 n = calcN(p);
+  float cosi = clamp(-dot(rd, n), 0.0, 1.0);
+  vec3 r = reflect(rd, n);
+  float lam = max(dot(n, LDIR), 0.0);
+  float sh = lam > 0.0 ? softShadow(p + n*0.012, LDIR) : 0.0;
+  vec3 gl = glowLight(p, n);
+  vec3 amb = uPaper*0.3*uKey + vec3(0.012);
+  vec3 light = vec3(lam*sh*uKey) + gl + amb;
+  gLod = 1.0 + 4.0*(1.0 - cosi);
+  vec3 env = envFull(p + n*0.004, r);
+  gLod = 0.0;
+  float fr = pow(1.0 - cosi, 5.0);
+  if (id < 1.5 && id > 0.5){                            // billet: steel, oxidised where hot
+    vec3 qb = p - uBil.xyz;
+    vec3 ob = bilObj(p); vec3 sf = bilSurf(ob); float skin = sf.x;
+    float T = billetT(p, sf);
+    float ox = smoothstep(0.08, 0.35, T);
+    // micro-relief of the sprayed deposit on the shading normal (silhouette stays clean)
+    { const float E = 0.006;
+      float l0 = fbm3(ob*12.0 + 30.0);                  // lumps: the cauliflower build-up of a sprayed deposit
+      vec3 gN = vec3(fbm3((ob + vec3(E, 0.0, 0.0))*38.0), fbm3((ob + vec3(0.0, E, 0.0))*38.0), fbm3((ob + vec3(0.0, 0.0, E))*38.0)) - sf.x;
+      gN += 1.6*(vec3(fbm3((ob + vec3(E, 0.0, 0.0))*12.0 + 30.0), fbm3((ob + vec3(0.0, E, 0.0))*12.0 + 30.0), fbm3((ob + vec3(0.0, 0.0, E))*12.0 + 30.0)) - l0);
+      float c = cos(uSpin), sn = sin(uSpin);
+      vec3 gw = vec3(c*gN.x + sn*gN.z, gN.y, -sn*gN.x + c*gN.z)/E;
+      vec3 nb = normalize(n - gw*0.009*uRough*uRough);
+      float lamB = max(dot(nb, LDIR), 0.0);
+      light = vec3(lamB*sh*uKey) + glowLight(p, nb) + amb; }
+    vec3 F0 = mix(mix(vec3(0.6, 0.605, 0.62), vec3(0.3), uRough), vec3(0.04), ox*0.9);
+    vec3 F = F0 + (1.0 - F0)*fr;
+    vec3 blur = light*0.3 + uPaper*0.12*uKey + softbox(p, r, 1e5)*0.012;
+    vec3 refl = mix(env, blur, clamp(uRough*0.96, 0.0, 0.97));
+    vec3 alb = mix(vec3(0.15), vec3(0.075 + 0.11*sf.x + 0.03*sf.y), uRough);
+    float tt = uTint*smoothstep(uBilH - 0.95, uBilH - 0.05, qb.y)*(0.75 + 0.5*skin);
+    vec3 tc = mix(vec3(1.0), vec3(1.05, 0.84, 0.5), smoothstep(0.0, 0.3, tt));
+    tc = mix(tc, vec3(0.85, 0.5, 0.32), smoothstep(0.3, 0.55, tt));
+    tc = mix(tc, vec3(0.55, 0.32, 0.62), smoothstep(0.55, 0.8, tt));
+    tc = mix(tc, vec3(0.32, 0.48, 0.9), smoothstep(0.8, 1.05, tt));
+    F *= tc; alb *= tc;
+    float lathe = (1.0 - uRough)*(0.5 + 0.5*sin(qb.y*120.0 + sin(qb.y*37.0)*2.0));
+    refl *= 1.0 - 0.1*lathe;
+    refl *= 1.0 - 0.95*ox;                            // hot oxide is matte: no wet streaks on the glowing part
+    vec3 col = (refl*F + (1.0 - F)*alb*light)*(1.0 - 0.6*uDark) + bb(T)*(0.8 + 0.2*sqrt(cosi));
+    {
+      vec3 Tg = normalize(vec3(-qb.z, 0.0, qb.x));
+      vec3 L1 = normalize(vec3(-0.62, 0.3, 0.72)), L2 = normalize(vec3(0.62, 0.3, 0.72));
+      float a1 = sqrt(max(1.0 - pow(dot(Tg, normalize(L1 - rd)), 2.0), 0.0)), a2 = sqrt(max(1.0 - pow(dot(Tg, normalize(L2 - rd)), 2.0), 0.0)), a3 = sqrt(max(1.0 - pow(dot(Tg, normalize(LDIR - rd)), 2.0), 0.0));
+      float an = pow(a1, 90.0) + pow(a2, 90.0) + 0.6*pow(a3, 60.0);
+      col += vec3(0.95, 0.97, 1.0)*an*(1.0 - uRough)*(1.0 - ox)*mix(1.6, 0.5, uDark)*max(uKey, 0.35)*(0.8 + 0.4*lathe);
+    }
+    col += uDark*pow(1.0 - cosi, 7.0)*vec3(0.65, 0.78, 1.0)*1.6;   // only a thin rim of light defines it
+    return col;
+  }
+  if (id > 2.5 && id < 3.5){                            // cut face: polished + etched
+    vec3 q = p - uBil.xyz;
+    vec3 m = micro(q.xy*0.5*uMS + vec2(0.0, 0.3));
+    float T = billetT(p, vec3(0.5, 0.5, 0.0))*0.5;
+    vec3 front = vec3(0.32)*max(dot(n, -rd), 0.0);
+    return m*vec3(0.95, 0.97, 1.0)*(light*0.42 + front) + env*(0.04 + 0.5*fr)*0.6 + bb(T);
+  }
+  if (id > 3.5 && id < 4.5){                            // powder heap: fine silver grain + glints
+    vec3 ng = normalize(n + (vec3(vnoise(p.xz*130.0), 0.0, vnoise(p.zx*130.0 + 5.0)) - vec3(0.5, 0.0, 0.5))*0.5);
+    light = vec3(max(dot(ng, LDIR), 0.0)*sh*uKey) + glowLight(p, ng) + amb;
+    float gr = vnoise(p.xz*95.0 + p.y*40.0)*0.3 + vnoise(p.xz*31.0)*0.15;
+    vec3 alb = vec3(0.17, 0.17, 0.168)*(0.8 + gr);
+    vec3 col = alb*light + env*(0.008 + 0.06*fr);
+    float gh = hash1(floor(p.xz*320.0) + floor(p.y*320.0)*7.0);
+    col += step(0.985, gh)*(pow(max(dot(r, LDIR), 0.0), 24.0)*1.6*uKey + softbox(p, r, 1e5)*0.03 + gl*0.6);
+    return col;
+  }
+  if (id > 5.5){                                         // scrap: rust with worn bare patches
+    float n1 = (vnoise(p.xy*11.0) + vnoise(p.yz*11.0 + 3.0) + vnoise(p.zx*11.0 + 7.0))/3.0, n2 = (vnoise(p.xy*5.0 + 9.0) + vnoise(p.yz*5.0 + 1.0) + vnoise(p.zx*5.0))/3.0;
+    float bare = smoothstep(0.6, 0.66, n2);
+    { const float E = 0.004; const float K = 38.0;
+      vec3 g = vec3(nz3((p + vec3(E, 0.0, 0.0))*K) - nz3((p - vec3(E, 0.0, 0.0))*K), nz3((p + vec3(0.0, E, 0.0))*K) - nz3((p - vec3(0.0, E, 0.0))*K), nz3((p + vec3(0.0, 0.0, E))*K) - nz3((p - vec3(0.0, 0.0, E))*K));
+      vec3 nb = normalize(n - g*1.6*(1.0 - bare*0.8));
+      light = vec3(max(dot(nb, LDIR), 0.0)*sh*uKey) + glowLight(p, nb) + amb; }
+    float n3 = (vnoise(p.xy*43.0) + vnoise(p.yz*43.0 + 5.0) + vnoise(p.zx*43.0 + 2.0))/3.0;
+    vec3 rust = mix(vec3(0.075, 0.042, 0.026), vec3(0.2, 0.095, 0.045), smoothstep(0.3, 0.7, n1))*(0.55 + 0.9*n3);
+    rust = mix(rust, vec3(0.045, 0.03, 0.025), smoothstep(0.62, 0.8, n3)*0.8);
+    vec3 alb = mix(rust, vec3(0.09), bare);
+    float f0 = mix(0.02, 0.3, bare);
+    float F = f0 + (1.0 - f0)*fr*mix(0.3, 1.0, bare);
+    vec3 rr2 = mix(light*0.25 + uPaper*0.1*uKey, env, bare*0.3);
+    return alb*light*(1.0 - F) + rr2*F;
+  }
+  // turntable / nozzle: machined, heat-darkened steel with lathe rings on the flats
+  vec3 q2 = p - uBil.xyz; float rr = length(q2.xz);
+  float flatF = step(0.85, abs(n.y));
+  float lathe2 = 0.5 + 0.5*sin(rr*160.0 + vnoise(vec2(rr*20.0, 1.0))*3.0);
+  float brush = vnoise(vec2(atan(q2.z, q2.x)*70.0, q2.y*3.0));
+  vec3 F0 = vec3(0.3, 0.31, 0.33);
+  vec3 F = F0 + (1.0 - F0)*fr;
+  vec3 refl = mix(env, light*0.22 + uPaper*0.08*uKey, 0.42 + 0.25*mix(brush, lathe2, flatF));
+  return refl*F*(0.85 + 0.15*mix(brush, lathe2, flatF)) + vec3(0.025)*light;
+}
+// primary ray: how much hot air (the column above the deposit) it passes through
+float hazeAmt(vec3 ro, vec3 rd){
+  if (uHaze <= 0.001) return 0.0;
+  vec2 o = ro.xz - vec2(uStr.x, 0.0), d = rd.xz; float a = dot(d, d);
+  float t = a > 1e-6 ? max(-dot(o, d)/a, 0.0) : 0.0;
+  vec3 c = ro + rd*t; float dxz = length(c.xz - vec2(uStr.x, 0.0));
+  float yl = uBil.y + uBilH - 0.2, yh = uStr.y + 0.2;
+  float dy = max(max(yl - c.y, c.y - yh), 0.0);
+  return uHaze*exp(-dxz*dxz*5.0)*exp(-dy*dy*4.0);
+}
+// the hot mist inside the spray cone (a few samples near the cone axis)
+vec3 sprayGlow(vec3 ro, vec3 rd, float tMax){
+  if (uGlowA.w <= 0.001 && uHaze <= 0.01) return vec3(0.0);
+  float yA = uGlowA.y, yT = uBil.y + uBilH;
+  float fum = 0.0;
+  vec2 o = ro.xz - vec2(uStr.x, 0.0), d = rd.xz; float a = dot(d, d);
+  float tc = a > 1e-6 ? -dot(o, d)/a : 0.0;
+  float acc = 0.0; const float HW = 1.3, DT = 2.0*HW/11.0;
+  float j = ign(gl_FragCoord.xy + fract(uTime*7.0)*37.0)*DT;
+  for (int i = 0; i < 12; i++){
+    float t = tc - HW + float(i)*DT + j; if (t < 0.0 || t > tMax) continue;
+    vec3 p = ro + rd*t;
+    if (p.y <= yA && p.y >= yT){
+      float rc = (yA - p.y)*0.6 + 0.03; float dx = length(p.xz - vec2(uStr.x, 0.0));
+      acc += exp(-dx*dx/(rc*rc)*2.2)/(rc*4.0 + 0.25)*smoothstep(yT, yT + 0.15, p.y);
+    }
+    float hg = p.y - yT;
+    if (uHaze > 0.01 && hg > 0.0 && hg < 2.8){
+      float rs = 0.3 + hg*0.3;
+      float dx2 = length(p.xz - vec2(uStr.x + sin(hg*1.2 + uTime*0.35)*0.14*hg, 0.0));
+      if (dx2 < rs*1.8){
+        float nn = vnoise(vec2(p.x*2.2 + p.z*1.1, hg*1.6 - uTime*0.42))*vnoise(vec2(p.z*2.5 - p.x*0.7 + 4.0, hg*2.2 - uTime*0.58));
+        fum += smoothstep(0.1, 0.5, nn)*exp(-dx2*dx2/(rs*rs))*smoothstep(0.0, 0.3, hg)*exp(-hg*0.9);
+      }
+    }
+  }
+  return bb(0.58)*acc*DT*uGlowA.w*0.16 + (uGlowCol*(0.35*uGlowB.w + 0.25*uGlowA.w) + uPaper*0.3)*fum*DT*uHaze*0.85;
+}
+void main(){
+  vec2 uv = (gl_FragCoord.xy*2.0 - uRes)/uRes.y;
+  vec3 ro = uCamPos, rd = normalize(uCamRot*vec3(uv*uTanF, -1.0));
+  vec3 Nc; float tc = cycHit(ro, rd, Nc); float tMax = min(tc, 40.0);
+  float t = 0.05, md = 1e9, tm = 0.0, hid = 0.0; bool hit = false;
+  for (int i = 0; i < 112; i++){
+    float d = map(ro + rd*t);
+    if (gId > 0.5){ float rr = d/max(t, 1e-3); if (rr < md){ md = rr; tm = t; } }
+    if (d < 0.0005*t + 0.0003){ hit = gId > 0.5; hid = gId; break; }
+    t += max(d*0.85, 0.0005*t); if (t > tMax) break;
+  }
+  vec3 col; float depth = 60.0;
+  if (hit){ col = shadeObj(ro, rd, ro + rd*t, hid); depth = t; }
+  else {
+    gHaze = hazeAmt(ro, rd);
+    if (tc < 1e4){ col = cycShade(ro + rd*tc, Nc, rd); depth = tc; } else col = uPaper*0.05*uKey;
+    gHaze = 0.0;
+    float pix = 2.2*uTanF/uRes.y;
+    if (md < pix){ map(ro + rd*tm); float id2 = gId; if (id2 > 0.5){ float cov = 1.0 - md/pix; col = mix(col, shadeObj(ro, rd, ro + rd*tm, id2), cov*cov*(3.0 - 2.0*cov)); if (cov > 0.35) depth = tm; } }
+  }
+  col += sprayGlow(ro, rd, depth);
+  gl_FragColor = vec4(max(col, 0.0), depth);
+}`;
+
+const quadScene = new THREE.Scene();
+const orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const studioMat = new THREE.ShaderMaterial({ uniforms: U, fragmentShader: FS, blending: THREE.NoBlending, depthTest: false, depthWrite: false,
+  vertexShader: `void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }` });
+quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), studioMat));
+
+// ---------- sparks: spray cone, overspray -> powder, ember ring, poke bursts (GPU) ----------
+const persp = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 80);
+const fxScene = new THREE.Scene();
+const FOCUS = { value: 6.0 };
+const SPU = {
+  uTime: U.uTime, uFocus: FOCUS, uH: { value: innerHeight },
+  uA: { value: new THREE.Vector3(0, Y_ATOM, 0) }, uTopY: { value: 0.3 }, uBilR: { value: R_B }, uBilC: { value: new THREE.Vector3(0, Y_B, 0) },
+  uSpray: { value: 1 }, uRing: { value: 0 }, uPowder: { value: 0 }, uFlare: { value: 0 },
+  uRingC: { value: new THREE.Vector4(0, 0.35, 0, 1.2) }, uMP: { value: new THREE.Vector3(1.5, -1.2, 0) },
+  uPtrW: { value: new THREE.Vector4(0, 0, 0, 0) }, uBurst: { value: new THREE.Vector4(0, 0, 0, -1) },
+  uVP: { value: new THREE.Vector2(innerWidth, innerHeight) }, uShutter: { value: 1 / 30 },
+  uHeroX: { value: 0 }, uSpk: { value: 1 },
+  uHitP: { value: [0, 1, 2].map(() => new THREE.Vector4(0, 0, 0, -99)) }, uHitV: { value: [0, 1, 2].map(() => new THREE.Vector4(0, 0, 0, 0)) },   // cursor strikes on the ring: xyz + time, velocity + strength     // zoomed ring hero: weight of the ring-only extra sparks + spark size scale
+};
+{
+  // every spark is a quad stretched between where it is now and where it was one shutter ago: real motion blur
+  // N0 = the working set every stage uses; the rest only exist in the zoomed ring hero (keeps the ring dense when the camera is close)
+  const N0 = MOBILE ? 900 : 2200, N = N0 + (HERO_ZOOM ? 12000 : 0), rnd = new Float32Array(N * 4), ex = new Float32Array(N);
+  let s = 7; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N * 4; i++) rnd[i] = r();
+  for (let i = N0; i < N; i++) ex[i] = 1;
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, -1, 0, 1, -1, 0, 1, 1, 0, 0, 1, 0]), 3));
+  g.setIndex([0, 1, 2, 0, 2, 3]);
+  g.setAttribute('rnd', new THREE.InstancedBufferAttribute(rnd, 4));
+  g.setAttribute('ex', new THREE.InstancedBufferAttribute(ex, 1));
+  g.instanceCount = N;
+  const m = new THREE.ShaderMaterial({ uniforms: SPU, transparent: true, depthTest: false, depthWrite: false,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+    blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+    vertexShader: `attribute vec4 rnd; attribute float ex;
+      uniform float uTime, uFocus, uTopY, uBilR, uSpray, uRing, uPowder, uFlare, uShutter, uHeroX, uSpk;
+      uniform vec2 uVP;
+      uniform vec3 uA, uBilC, uMP; uniform vec4 uRingC, uPtrW, uBurst; uniform vec4 uHitP[3], uHitV[3];
+      varying vec3 vCol; varying float vA; varying vec2 vQ;
+      vec3 bb(float t){ t = clamp(t, 0.0, 1.3); return vec3(1.0, 0.30 + 0.70*t*t, 0.05 + 0.95*t*t*t*t)*pow(t, 2.4)*10.0; }
+      void spark(float T, out vec3 pos, out float a, out vec3 col){
+        float r0 = rnd.x, r1 = rnd.y, r2 = rnd.z, r3 = rnd.w;
+        float life = fract(T*(0.8 + 0.55*r1) + r0*7.31);
+        float th = pow(r2, 0.7)*0.58, ph = r3*6.2831853 + r0*3.0;
+        vec3 dir = vec3(sin(th)*cos(ph), -cos(th), sin(th)*sin(ph));
+        float L = max(uA.y - uTopY, 0.3)/cos(th);
+        float s = life*1.9;
+        vec3 ps = uA + dir*L*min(s, 1.0);
+        float aS = smoothstep(0.0, 0.03, life), tS = 0.82 - 0.36*min(s, 1.0);
+        float rad = length((uA + dir*L).xz - uBilC.xz);
+        if (s > 1.0){
+          if (rad < uBilR*1.04) aS = 0.0;
+          else { float k = (s - 1.0)*0.55; ps = uA + dir*L*(1.0 + k*0.9) + vec3(0.0, -3.0*k*k, 0.0); ps.y = max(ps.y, -1.33); tS = 0.45 - k*0.7; aS *= 1.0 - smoothstep(0.25, 0.5, k); }
+        }
+        // the mark: a brush-stroke ring, open at 12 o'clock (screen up = -z = angle 4.71), thicker bottom-left,
+        // tapering into both ends, the left end flicking outward like the hook in the logo
+        float ang = r0*6.2831853 + T*(0.16 + 0.12*r1);
+        float wa = mod(ang, 6.2831853);
+        float g0 = 4.72, g1 = 4.9;                                     // the gap
+        float toEnd = min(mod(g0 - wa + 6.2831853, 6.2831853), mod(wa - g1 + 6.2831853, 6.2831853));   // radians to the nearest stroke end
+        // ouroboros: the tail (g1 side) tapers to a thread, the head (g0 side) swells and its jaw closes over the tail
+        float dHead = mod(g0 - wa + 6.2831853, 6.2831853), dTail = mod(wa - g1 + 6.2831853, 6.2831853);
+        float head = exp(-pow((dHead - 0.22)/0.2, 2.0));                       // the head: a swelling just before the end
+        float tailT = mix(0.12, 1.0, smoothstep(0.0, 1.3, dTail));             // long taper into the tail tip
+        float thick = (0.75 + 0.45*smoothstep(-0.2, 1.0, cos(wa - 2.3)))*tailT*(1.0 + 1.1*head)*mix(0.55, 1.0, smoothstep(0.0, 0.08, dHead));
+        float hook = smoothstep(0.35, 0.0, dHead);                             // the jaw flicks outward, over the tail
+        // zoomed hero: one unbroken stroke - no gap, no thread tail, no hook; thickness is a smooth function of angle only
+        // (the head stays as a soft, wrapped swelling). As the camera pulls back uHeroX -> 0 and it re-forms into the open mark.
+        float dW = mod(wa - (g0 - 0.22) + 3.1415927, 6.2831853) - 3.1415927, headC = exp(-dW*dW/0.12);
+        thick = mix(thick, 0.8 + 0.3*smoothstep(-0.2, 1.0, cos(wa - 2.3)) + 0.3*headC, uHeroX);
+        hook *= 1.0 - uHeroX; head = mix(head, headC, uHeroX);
+        float spr = mix(r2 - 0.5, (r2 + fract(r2*53.7 + r3*17.3) - 1.0)*0.45, uHeroX);   // zoomed hero: centre-weighted spread, so the stroke has a hot core instead of a flat band
+        float rr = uRingC.w*(1.0 + spr*0.16*thick + hook*hook*0.13);
+        float angH = ang + hook*hook*0.16;
+        vec3 pr = uRingC.xyz + vec3(cos(angH)*rr, (r3 - 0.5)*0.05*thick, sin(angH)*rr);
+        float aR = mix(1.0 - smoothstep(g0 - 0.08, g0 - 0.01, wa)*(1.0 - smoothstep(g1 - 0.04, g1 + 0.02, wa)), 1.0, uHeroX);
+        float tR = 0.52 + 0.16*r1 + 0.06*sin(T*5.0 + r0*40.0) + 0.1*head;
+        pos = mix(ps, pr, uRing);
+        a = mix(aS*uSpray*(1.0 + uFlare), aR*uRing, uRing);
+        col = bb(mix(tS, tR, uRing));
+        if (r1 < 0.3 && uPowder > 0.001){
+          float lp = fract(T*0.32*(0.7 + 0.6*r3) + r1*5.1);
+          vec3 p0 = uA + vec3((r2 - 0.5)*0.9, -0.5, (r3 - 0.5)*0.7);
+          vec3 pp = mix(p0, uMP + vec3((r2 - 0.5)*0.5, 0.0, (r0 - 0.5)*0.4), lp*lp) + vec3(sin(lp*6.0 + r0*20.0)*0.07, 0.0, cos(lp*5.0 + r1*20.0)*0.07);
+          pos = mix(pos, pp, uPowder); a = mix(a, 0.45*smoothstep(0.0, 0.1, lp)*(1.0 - smoothstep(0.85, 1.0, lp)), uPowder);
+          col = mix(col, vec3(0.62, 0.63, 0.66), uPowder);
+        }
+        float bw = uBurst.w - (uTime - T);
+        if (r0 < 0.16 && uBurst.w >= 0.0 && bw >= 0.0 && bw < 1.5){
+          float tb = bw*(0.75 + 0.5*r1);
+          vec3 bd = normalize(vec3(r2 - 0.5, r3*0.9 + 0.1, r1 - 0.5));
+          vec3 pb = uBurst.xyz + bd*tb*(1.2 + r3*1.8) + vec3(0.0, -2.6*tb*tb, 0.0); pb.y = max(pb.y, -1.33);
+          float ab = 1.0 - smoothstep(0.5, 1.2, tb);
+          pos = mix(pos, pb, step(0.01, ab)); a = max(a*(1.0 - ab), ab*1.2); col = bb(0.85 - tb*0.35);
+        }
+      }
+      // a fast cursor pass STRIKES the ring: bound sparks dent along the swing and spring back, loose ones (r1 < 0.35)
+      // fly off ballistically, flare, vanish and re-form in the stroke. Stateless: every offset is a function of the strike's age.
+      vec3 hitOff(vec3 p, float T, inout float glow, inout float fade){
+        vec3 o = vec3(0.0);
+        for (int k = 0; k < 3; k++){
+          float age = T - uHitP[k].w;
+          if (age < 0.0 || age > 1.6) continue;
+          vec2 d = p.xz - uHitP[k].xz; float w = exp(-dot(d, d)/0.08);
+          if (w < 0.01) continue;
+          float s = uHitV[k].w, loose = step(rnd.y, 0.35);
+          vec3 outw = normalize(vec3(d.x, 0.0, d.y) + vec3(1e-4, 0.0, 0.0));
+          vec3 v = uHitV[k].xyz*(0.5 + rnd.z) + outw*(0.35 + 0.65*rnd.w);
+          float back = (1.0 - exp(-age*22.0))*exp(-age*3.2);                        // dent, then heal
+          float fly = age*(1.0 - 0.28*age)*(1.0 - smoothstep(1.4, 1.5, age));        // thrown, dragging, parked once invisible
+          o += w*s*mix(v*0.32*back, v*1.0*fly + vec3(0.0, 0.9*age - 1.3*age*age, 0.0), loose);
+          glow += w*s*exp(-age*5.0)*3.5;
+          fade *= 1.0 - loose*min(w*s*4.0, 1.0)*smoothstep(0.55, 1.0, age)*(1.0 - smoothstep(1.5, 1.6, age));
+        }
+        return o;
+      }
+      void main(){
+        vec3 p1, p0, c1, c0; float a1, a0;
+        spark(uTime, p1, a1, c1);
+        spark(uTime - uShutter, p0, a0, c0);
+        if (ex > 0.5) a1 *= uHeroX*uRing;                         // extra sparks: ring hero only
+        if (distance(p0, p1) > mix(0.5, 0.1, uRing)) p0 = p1;   // ring: the hook snaps back at the stroke end, never draw that jump                  // a new life started: no streak across the set
+        if (uRing > 0.01){
+          float g1 = 0.0, f1 = 1.0, g0 = 0.0, f0 = 1.0;
+          p1 += hitOff(p1, uTime, g1, f1)*uRing; p0 += hitOff(p0, uTime - uShutter, g0, f0)*uRing;
+          a1 *= mix(1.0, f1, uRing); c1 *= 1.0 + g1*uRing;
+        }
+        vec3 dp = uPtrW.xyz - p1;
+        float anchor = smoothstep(0.15, 0.85, distance(p1, uA));   // the cone stays attached to the stream; only droplets further down lean toward the cursor
+        vec3 pull = dp*uPtrW.w*exp(-dot(dp, dp)*2.4)*0.35*anchor; p1 += pull; p0 += pull;
+        vec4 h1 = projectionMatrix*modelViewMatrix*vec4(p1, 1.0), h0 = projectionMatrix*modelViewMatrix*vec4(p0, 1.0);
+        float w1 = max(h1.w, 0.05), w0 = max(h0.w, 0.05);
+        vec2 s1 = h1.xy/w1*0.5*uVP, s0 = h0.xy/w0*0.5*uVP;
+        vec2 dir = s1 - s0; float L = length(dir); dir = L > 1e-3 ? dir/L : vec2(1.0, 0.0);
+        vec2 nrm = vec2(-dir.y, dir.x);
+        float coc = clamp(abs(w1 - uFocus)*1.1, 0.0, 14.0);
+        float hw = (0.7 + rnd.w*0.9)*(1.0 + uFlare*0.4)*0.0052*uVP.y/w1*uSpk + coc*uVP.y*0.0014;
+        vec2 sp = mix(s0, s1, position.x) + dir*(position.x*2.0 - 1.0)*hw + nrm*position.y*hw;
+        vQ = position.xy;
+        vA = a1/(1.0 + coc*coc*0.22)*(2.0*hw + 3.0)/(2.0*hw + 3.0 + L*0.22);
+        vCol = c1;
+        gl_Position = vec4(sp/(0.5*uVP)*w1, h1.z, h1.w);
+      }`,
+    fragmentShader: `varying vec3 vCol; varying float vA; varying vec2 vQ;
+      void main(){ if (vA < 0.002) discard;
+        float across = 1.0 - abs(vQ.y);
+        float a = across*across*mix(0.25, 1.0, vQ.x)*vA;
+        gl_FragColor = vec4(vCol*a*1.6, 0.0); }` });
+  const sparks = new THREE.Mesh(g, m); sparks.frustumCulled = false; fxScene.add(sparks);
+}
+// warm dust / embers drifting in the light
+const DUSTU = { uTime: U.uTime, uFocus: FOCUS, uH: SPU.uH, uDark: U.uDark, uWarm: { value: 1 } };
+{
+  const N = MOBILE ? 120 : 220, pp = new Float32Array(N * 3), ps = new Float32Array(N), pr = new Float32Array(N);
+  let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < N; i++) { pp[i*3] = (r() - .5) * 10; pp[i*3+1] = r() * 4.2 - 1.3; pp[i*3+2] = r() * 7 - 1.8; ps[i] = 0.5 + r() * r() * 2.2; pr[i] = r(); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pp, 3)); g.setAttribute('size', new THREE.BufferAttribute(ps, 1)); g.setAttribute('rnd', new THREE.BufferAttribute(pr, 1));
+  const m = new THREE.ShaderMaterial({ uniforms: DUSTU, transparent: true, depthTest: false, depthWrite: false,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+    blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+    vertexShader: `attribute float size, rnd; uniform float uTime, uFocus, uH; varying float vA, vCoc, vR;
+      void main(){ vec3 p = position; float t = uTime*(0.4 + rnd*0.5);
+        p += vec3(sin(t*0.37 + rnd*20.0), sin(t*0.23 + rnd*9.0)*0.6 + mod(uTime*0.05*(0.5 + rnd), 1.0)*0.5, cos(t*0.29 + rnd*14.0))*0.35;
+        vec4 mv = modelViewMatrix*vec4(p, 1.0); float d = max(-mv.z, 0.05);
+        float coc = clamp(abs(d - uFocus)*1.2, 0.0, 16.0);
+        gl_PointSize = size*0.014*uH/d + coc*uH*0.0042;
+        vCoc = coc; vR = rnd; vA = (0.35 + 0.65*rnd)/(1.0 + coc*coc*0.45)*smoothstep(0.2, 0.9, d);
+        gl_Position = projectionMatrix*mv; }`,
+    fragmentShader: `uniform float uDark, uWarm; varying float vA, vCoc, vR;
+      void main(){ vec2 c = gl_PointCoord*2.0 - 1.0; float r = length(c); if (r > 1.0) discard;
+        float sharp = smoothstep(1.0, 0.15, r), disk = smoothstep(1.0, 0.84, r)*(0.72 + 0.28*smoothstep(0.45, 0.95, r));
+        float a = mix(sharp, disk, clamp(vCoc*0.35, 0.0, 1.0))*vA;
+        vec3 tint = mix(vec3(0.9, 0.93, 1.0), mix(vec3(1.0, 0.55, 0.2), vec3(1.0, 0.8, 0.55), vR), uWarm);
+        gl_FragColor = vec4(tint*a*mix(0.28, 0.5, max(uDark*0.6, uWarm*0.8)), 0.0); }` });
+  const pts = new THREE.Points(g, m); pts.frustumCulled = false; fxScene.add(pts);
+}
+
+// ---------- post: DOF -> bloom -> lens -> ACES ----------
+const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+const composer = new EffectComposer(renderer, rt);
+composer.addPass(new RenderPass(quadScene, orthoCam));
+const fxPass = new RenderPass(fxScene, persp); fxPass.clear = false; composer.addPass(fxPass);
+const dof = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uFocus: FOCUS, uAp: { value: 8 }, uMaxR: { value: 13 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uFocus, uAp, uMaxR; uniform vec2 uRes; varying vec2 vUv;
+    float coc(vec2 uv){ float d = texture2D(tDiffuse, uv).a; if (d <= 0.0) d = 60.0; return clamp(abs(d - uFocus)/d*uAp, 0.0, uMaxR); }
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
+    void main(){
+      float c0 = coc(vUv);
+      vec3 acc = min(texture2D(tDiffuse, vUv).rgb, vec3(8.0)); float w = 1.0;
+      if (c0 > 0.35 || uAp > 0.0){
+        const float GA = 2.39996323; float rot = h(vUv*uRes)*6.2831;
+        for (int i = 1; i < 40; i++){
+          float fi = float(i); float r = sqrt((fi + h(vUv*uRes + fi)*0.5)/40.0)*uMaxR;
+          vec2 o = vec2(cos(fi*GA + rot), sin(fi*GA + rot))*r/uRes;
+          float cs = coc(vUv + o);
+          float wt = smoothstep(r - 1.0, r + 1.0, min(cs, c0 + 2.0));
+          acc += min(texture2D(tDiffuse, vUv + o).rgb, vec3(8.0))*wt; w += wt;
+        }
+      }
+      gl_FragColor = vec4(acc/w, 1.0);
+    }` });
+dof.uniforms.uFocus = FOCUS;               // ShaderPass clones uniforms: rebind the shared ones
+composer.addPass(dof);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.6, 0.6, 0.85);
+composer.addPass(bloom);
+const lens = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uTime: U.uTime, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) }, uVig: { value: 0.35 },
+    uHz: { value: new THREE.Vector4(0.5, 0.5, 0.9, 0) }, uHzW: { value: 0.05 }, uStreak: { value: 0 } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uVig, uHzW, uStreak; uniform vec2 uRes; uniform vec4 uHz; varying vec2 vUv;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
+    float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0 - 2.0*f);
+      return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
+    void main(){
+      vec2 uv = vUv;
+      if (uHz.w > 0.001){            // hot air rising off the deposit bends everything behind it
+        float wx = (vUv.x - uHz.x)/uHzW;
+        float wy = smoothstep(uHz.y - 0.05, uHz.y + 0.12, vUv.y)*(1.0 - smoothstep(uHz.z - 0.25, uHz.z, vUv.y));
+        float k = uHz.w*exp(-wx*wx)*wy;
+        vec2 q = vec2(vUv.x*uRes.x/uRes.y, vUv.y);
+        uv += (vec2(vn(q*15.0 + vec2(0.0, -uTime*2.0)), vn(q*15.0 + vec2(7.0, -uTime*2.4))) - 0.5)*vec2(0.3, 1.0)*k*0.0035;
+      }
+      vec2 d = uv - 0.5; float r2 = dot(d, d);
+      vec2 ca = d*r2*0.016;
+      vec3 col = vec3(texture2D(tDiffuse, uv + ca).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - ca).b);
+      if (uStreak > 0.001){
+        vec3 st = vec3(0.0);
+        float jt = h(vUv*uRes + fract(uTime*3.0)*61.0) - 0.5;   // jitter the taps, otherwise the streak is a comb of copies
+        for (int i = -12; i <= 12; i++){ float fi = float(i) + jt; vec3 sm = texture2D(tDiffuse, uv + vec2(fi*0.008, 0.0)).rgb; st += max(sm - 1.6, 0.0)*exp(-abs(fi)*0.17); }
+        col += st*vec3(1.0, 0.52, 0.22)*0.012*uStreak;
+      }
+      col *= mix(1.0, 1.0 - uVig, smoothstep(0.1, 0.7, r2*1.9));
+      float g = h(vUv*uRes + fract(uTime*7.0)*97.0) - 0.5;
+      col += g*0.022*(0.35 + 0.65*(1.0 - clamp(dot(col, vec3(0.33)), 0.0, 1.0)));
+      gl_FragColor = vec4(col, 1.0);
+    }` });
+lens.uniforms.uTime = U.uTime;
+composer.addPass(lens);
+composer.addPass(new OutputPass());
+
+function resize() {
+  renderer.setPixelRatio(quality);
+  renderer.setSize(innerWidth, innerHeight, false);
+  composer.setPixelRatio(quality);
+  composer.setSize(innerWidth, innerHeight);
+  U.uRes.value.set(innerWidth * quality, innerHeight * quality);
+  dof.uniforms.uRes.value.set(innerWidth, innerHeight);
+  lens.uniforms.uRes.value.set(innerWidth, innerHeight);
+  SPU.uH.value = innerHeight * quality; SPU.uVP.value.set(innerWidth * quality, innerHeight * quality);
+  persp.aspect = innerWidth / innerHeight; persp.updateProjectionMatrix();
+  layoutKeys();
+}
+
+// ---------- print on the studio wall ----------
+const tcv = document.createElement('canvas'); tcv.width = 2048; tcv.height = 1024;
+const tctx = tcv.getContext('2d');
+const textTex = new THREE.CanvasTexture(tcv); textTex.anisotropy = 8; textTex.generateMipmaps = true;
+textTex.premultiplyAlpha = true; textTex.colorSpace = THREE.SRGBColorSpace;
+textTex.minFilter = THREE.LinearMipmapLinearFilter;
+U.uText.value = textTex;
+let wallKey = '';
+const FONT = '"Hanken Grotesk", "Helvetica Neue", Arial, sans-serif';
+function drawWall(word) {
+  if (word === wallKey) return; wallKey = word;
+  const W = tcv.width, H = tcv.height;
+  tctx.clearRect(0, 0, W, H); tctx.fillStyle = '#fff'; tctx.textAlign = 'center'; tctx.textBaseline = 'alphabetic';
+  try { tctx.letterSpacing = '-0.02em'; } catch (e) {}
+  let size = 640; tctx.font = `800 ${size}px ${FONT}`;
+  const wm = tctx.measureText(word).width;
+  size = Math.min(size * (W * 0.96) / wm, H * 0.74); tctx.font = `800 ${size}px ${FONT}`;
+  tctx.fillText(word, W / 2, H / 2 + size * 0.36);
+  textTex.needsUpdate = true;
+}
+
+// ---------- stages ----------
+const col = (h) => new THREE.Color(h);
+const lum0 = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+const STAGES = [
+  { cam: [0, 0.15, 8.2], tgt: [0, -0.2, 0], foc: [0, 0.1, 0], fov: 30, ap: 5, paper: col('#3b3632'), key: 0.3, dark: 0, text: 1, word: 'ASGAARD', hold: 0.0 },     // hero
+  { cam: [-1.2, 0.4, 8.0], tgt: [-2.0, -0.1, 0], foc: [0, 0.1, 0], fov: 30, ap: 8, paper: col('#443d37'), key: 0.32, dark: 0, text: 1, word: '1932', tx: 0.5, hold: 0.2 }, // story
+  { cam: [0, 1.4, 6.0], tgt: [0, -0.8, 0.5], foc: [0, -1.1, 0.9], fov: 32, ap: 7, paper: col('#d9d5ce'), key: 1.0, dark: 0, text: 0, word: '', hold: 0.25 },       // scrap
+  { cam: [-0.75, 0.45, 8.2], tgt: [-0.75, 0.05, 0], foc: [0, -0.1, 0], fov: 32, ap: 5, paper: col('#36312d'), key: 0.24, dark: 0, text: 0, word: '', hold: 0.88 },          // spray (pinned)
+  { cam: [-0.45, 0.5, 8.0], tgt: [-0.45, -0.35, 0], foc: [0.6, -0.5, 0.2], fov: 30, ap: 6, paper: col('#e6e4e0'), key: 1.0, dark: 0, text: 1, word: '1.4125', tx: 0.75, tw: 0.85, hold: 0.3 }, // duality
+  { cam: [-0.58, 0.05, 2.7], tgt: [-0.58, 0.05, 0], foc: [0, 0.02, 0], fov: 34, ap: 12, paper: col('#2c2a28'), key: 1.0, dark: 0, text: 0, word: '', hold: 0.3 },   // macro
+  { cam: [-1.45, 7.1, 1.2], tgt: [-1.45, -0.6, 0], foc: [0, 0.6, 0], fov: 34, ap: 5, paper: col('#3d3834'), key: 0.3, dark: 0, text: 0, word: '', hold: 0.3 },     // one-to-one (top-down)
+  { cam: [-0.1, 0.5, 8.3], tgt: [-1.2, -0.25, 0], foc: [0.4, -0.4, 0], fov: 30, ap: 7, paper: col('#eeece8'), key: 1.0, dark: 0, text: 1, word: 'ODIN44', tx: 0.55, tw: 0.72, hold: 0.3 }, // products
+  { cam: [0, 1.1, 9.0], tgt: [0, 1.25, 0], foc: [0, -0.2, 0], fov: 30, ap: 6, paper: col('#0a0909'), key: 0.2, dark: 1, text: 0, word: '', hold: 0.0 },            // contact
+];
+if (HERO_RING) {                          // hero variant: look straight down on the mark
+  // zoomed in: ring centre sits below the fold, so only the upper arc shows and the dot + column stay hidden until the scroll swings down
+  // (was cam [0, 11.2, 2.3], tgt [0, -0.6, 0.72], fov 30 = whole ring + dot visible). window.__HERO_CAM = {cam, tgt, fov} overrides for tuning.
+  Object.assign(STAGES[0], { cam: [0, 9.31, -0.09], tgt: [0, -0.6, -1.4], foc: [0, 0.38, -0.6], fov: 8.5, ap: 5, text: 0, word: '', hold: 0.0 }, window.__HERO_CAM || {});
+}
+if (MOBILE || NARROW) {
+  STAGES[0].cam = [0, 0.0, 9.4]; STAGES[0].tgt = [0, -1.35, 0]; STAGES[0].fov = 36;
+  STAGES[1].cam = [0, 1.2, 9.2]; STAGES[1].tgt = [0, 2.0, 0]; STAGES[1].fov = 36;
+  STAGES[2].cam = [0, 2.3, 9.2]; STAGES[2].tgt = [0, -0.25, 0.8]; STAGES[2].fov = 38;
+  STAGES[3].cam = [0, 0.1, 10.2]; STAGES[3].tgt = [0, -0.3, 0]; STAGES[3].fov = 36;
+  STAGES[4].cam = [0.72, 1.7, 8.6]; STAGES[4].tgt = [0.72, 1.25, 0]; STAGES[4].fov = 38;
+  STAGES[5].cam = [0, 0.05, 2.2]; STAGES[5].tgt = [0, -0.25, 0]; STAGES[5].fov = 40;
+  STAGES[6].cam = [0, 9.5, 1.2]; STAGES[6].tgt = [0, -0.6, -1.9]; STAGES[6].fov = 40;
+  STAGES[7].cam = [0, 0.4, 8.6]; STAGES[7].tgt = [0, 1.3, 0]; STAGES[7].fov = 38;
+  STAGES[8].cam = [0, 2.3, 9.4]; STAGES[8].tgt = [0, 2.75, 0];
+  if (HERO_RING) { STAGES[0].cam = [0, 15.5, 2.3]; STAGES[0].tgt = [0, -0.6, 1.25]; STAGES[0].fov = 36; STAGES[0].foc = [0, 0.35, 0]; } STAGES[8].fov = 36;
+}
+
+// products hover: 0 = ODIN (billet), 1..3 = THOR (powder)
+const FORCE_PROD = typeof window.__FORCE_PROD === 'number' ? window.__FORCE_PROD : null;
+let prodSel = FORCE_PROD !== null ? FORCE_PROD : 0, prodThor = prodSel > 0 ? 1 : 0, prodWord = $$('.prod')[prodSel] ? $$('.prod')[prodSel].dataset.word : 'ODIN44';
+$$('.prod').forEach(a => {
+  const on = () => { prodSel = +a.dataset.p; prodWord = a.dataset.word; $$('.prod').forEach(b => b.classList.toggle('sel', b === a)); burstAt(prodSel ? new THREE.Vector3(0.2, -0.9, 0) : new THREE.Vector3(0, 0.55, 0), 0.25); };
+  a.addEventListener('mouseenter', on); a.addEventListener('focus', on);
+});
+$$('.prod')[prodSel] && $$('.prod')[prodSel].classList.add('sel');
+
+// microstructure slider
+const grainEl = $('#am-grain');
+let grainT = typeof window.__FORCE_GRAIN === 'number' ? window.__FORCE_GRAIN : 0, grainCur = grainT;
+if (grainEl) { grainEl.value = grainT; grainEl.addEventListener('input', () => { grainT = +grainEl.value; }); }
+
+// stage keys = section tops in viewport heights
+const sections = $$('section[data-stage]');
+let keys = [];
+function layoutKeys() { keys = sections.map(s => s.offsetTop / innerHeight); }
+function stageFromScroll() {
+  const g = scrollY / innerHeight;
+  for (let i = 0; i < keys.length - 1; i++) if (g < keys[i + 1]) return i + clamp((g - keys[i]) / (keys[i + 1] - keys[i]));
+  return keys.length - 1;
+}
+function scrollForStage(S) {
+  const i = Math.min(Math.floor(S), keys.length - 1), f = S - i;
+  return (i < keys.length - 1 ? mix(keys[i], keys[i + 1], f) : keys[i]) * innerHeight;
+}
+
+// ---------- scrap pieces ----------
+// type: 0 bar offcut, 1 bearing ring, 2 drill, 3 gear ; rest pose lies on the floor
+const SCR = [
+  { type: 3, s: 0.56, x: -1.62, z: 0.95, yaw: 0.4, lie: [0, 0, 0], rest: 0.09 },
+  { type: 1, s: 0.5, x: -0.55, z: 1.15, yaw: 0.0, lie: [0, 0, 0], rest: 0.17 },
+  { type: 2, s: 0.62, x: 0.5, z: 0.95, yaw: -0.5, lie: [0, 0, Math.PI / 2], rest: 0.13 },
+  { type: 0, s: 0.5, x: 1.6, z: 1.1, yaw: 0.35, lie: [0, 0, 0], rest: 0.24 },
+].map((d, i) => ({ ...d, i, pos: new THREE.Vector3(), off: new THREE.Vector3(), vel: new THREE.Vector3(), fedT: -99, drag: false, w: 0 }));
+SCR.forEach((d, i) => { U.uScrT.value[i] = d.type; });
+if (NARROW) SCR.forEach((d, i) => { d.x = [-0.62, 0.62, -0.62, 0.62][i]; d.z = [0.35, 0.35, 1.45, 1.45][i]; d.s *= 0.9; });
+const eul = new THREE.Euler(), m4 = new THREE.Matrix4(), m3 = new THREE.Matrix3(), qTmp = new THREE.Quaternion();
+
+// ---------- interaction ----------
+const ptr = { x: 0, y: 0, sx: 0, sy: 0, vx: 0, vy: 0, has: false, t: 0, cx: -99, cy: -99, over: false };
+addEventListener('pointermove', (e) => {
+  const x = e.clientX / innerWidth * 2 - 1, y = -(e.clientY / innerHeight * 2 - 1), now = performance.now();
+  const dtp = Math.max((now - ptr.t) / 1000, 1 / 240);
+  if (ptr.has && dtp < 0.1) { ptr.vx += ((x - ptr.x) / dtp - ptr.vx) * 0.5; ptr.vy += ((y - ptr.y) / dtp - ptr.vy) * 0.5; }
+  ptr.x = x; ptr.y = y; ptr.t = now; ptr.has = true; ptr.cx = e.clientX; ptr.cy = e.clientY;
+  ptr.over = !!(e.target.closest && e.target.closest('a,button,input'));
+}, { passive: true });
+document.addEventListener('pointerleave', () => { ptr.has = false; });
+
+const hitPrev = { p: new THREE.Vector3(), has: false }, hitVel = new THREE.Vector3(); let hitT = -9, hitN = 0;
+let camPos = new THREE.Vector3(), camRot = new THREE.Matrix3(), tanF = 0.27;
+const rayFromNDC = (x, y) => new THREE.Vector3(x * tanF * persp.aspect, y * tanF, -1).applyMatrix3(camRot).normalize();
+function hitBillet(rd) {           // ray vs the billet's cylinder (cut face respected)
+  const H = U.uBilH.value; if (H < 0.08) return null;
+  const bx = U.uBil.value.x, ox = camPos.x - bx, oz = camPos.z - U.uBil.value.z;
+  const a = rd.x * rd.x + rd.z * rd.z, b = ox * rd.x + oz * rd.z, c = ox * ox + oz * oz - R_B * R_B, h = b * b - a * c;
+  if (h <= 0 || a < 1e-6) return null;
+  let t = (-b - Math.sqrt(h)) / a; let p = camPos.clone().addScaledVector(rd, t);
+  if (p.z > U.uCut.value) { const tp = (U.uCut.value - camPos.z) / rd.z; const pp = camPos.clone().addScaledVector(rd, tp); if (tp > 0 && Math.hypot(pp.x - bx, pp.z) <= R_B) { t = tp; p = pp; } else return null; }
+  const top = Y_B + H;
+  if (p.y < Y_B || p.y > top + 0.02) {    // maybe through the top cap
+    if (rd.y < 0) { const tt = (top - R_B * 0.25 - camPos.y) / rd.y; const pt = camPos.clone().addScaledVector(rd, tt); if (tt > 0 && Math.hypot(pt.x - bx, pt.z) < R_B * 0.95) return { p: pt, t: tt }; }
+    return null;
+  }
+  return t > 0 ? { p, t } : null;
+}
+function hitScrap(rd) {
+  let best = null, bt = 1e9;
+  SCR.forEach(d => { if (d.w < 0.2) return; const oc = camPos.clone().sub(d.pos); const r = d.s * 0.75, b = oc.dot(rd), c = oc.lengthSq() - r * r, h = b * b - c;
+    if (h > 0) { const t = -b - Math.sqrt(h); if (t > 0 && t < bt) { bt = t; best = { d, t, p: camPos.clone().addScaledVector(rd, t) }; } } });
+  return best;
+}
+const heat = [];
+function heatAt(p, a) { heat.push({ p: p.clone(), t0: clock, a }); if (heat.length > NHEAT) heat.shift(); }
+let burstT = -99; const burstP = new THREE.Vector3();
+function burstAt(p, delay = 0) { burstP.copy(p); burstT = clock + delay; }
+let drag = null, press = null, heatT = 0;
+addEventListener('pointerdown', (e) => {
+  if (e.target.closest('a,button,input')) return;
+  const x = e.clientX / innerWidth * 2 - 1, y = -(e.clientY / innerHeight * 2 - 1);
+  const rd = rayFromNDC(x, y);
+  const hs = hitScrap(rd), hb = hs ? null : hitBillet(rd);
+  if (!hs && !hb) return;
+  press = { t: clock, x: e.clientX, y: e.clientY, hs, hb };
+  if (hs && e.pointerType === 'mouse' && !REDUCED) {
+    drag = { d: hs.d, depth: hs.t, grab: hs.p.clone().sub(hs.d.pos), y0: hs.d.pos.y };
+    hs.d.drag = true; document.body.style.userSelect = 'none'; e.preventDefault();
+  }
+});
+function feed(d) { d.fedT = clock; d.drag = false; burstAt(new THREE.Vector3(d.pos.x * 0.4, 1.9, 0), 0.45); }
+addEventListener('pointerup', (e) => {
+  const click = press && clock - press.t < 0.28 && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 8;
+  if (click && press.hb) { heatAt(press.hb.p, 0.62); burstAt(press.hb.p); }
+  if (drag) {
+    const d = drag.d; d.drag = false;
+    if (click || d.off.y > 0.45) feed(d);
+    drag = null; document.body.style.userSelect = '';
+  } else if (click && press.hs) feed(press.hs.d);
+  press = null;
+});
+addEventListener('blur', () => { if (drag) { drag.d.drag = false; drag = null; } });
+
+// ---------- scene state as a pure function of S ----------
+const odinW = { v: 1 }, thorW = { v: 0 };
+function sceneState(S, t, ti) {
+  const iL = REDUCED ? 1 : ease(ti / 0.7), iS = REDUCED ? 1 : ease((ti - 0.55) / 0.5);
+  const P = {};
+  // melt stream length 0..1 and spray intensity
+  if (S < 1.5) { P.len = iL; P.spray = iS; }
+  else if (S < 3) { P.len = 1 - ease((S - 1.5) / 0.25); P.spray = 1 - ease((S - 1.5) / 0.16); }
+  else if (S < 4) { const u = S - 3; P.len = ease((u - 0.07) / 0.08) * (1 - ease((u - 0.9) / 0.09)); P.spray = ease((u - 0.15) / 0.06) * (1 - ease((u - 0.86) / 0.07)); }
+  else { P.len = 0; P.spray = 0; }
+  if (S < 1.5) P.spray = Math.min(P.spray, iS);
+  // billet height
+  const wProd = sstep(6.45, 6.85, S) * (1 - sstep(7.35, 7.7, S));
+  if (S < 1.6) P.H = 1.3;
+  else if (S < 3.2) P.H = 1.3 * (1 - ease((S - 1.6) / 0.35));
+  else if (S < 3.84) P.H = 1.6 * ease((S - 3.2) / 0.62);
+  else P.H = mix(mix(1.6, 1.45 * odinW.v, wProd), 1.0, ease((S - 7.6) / 0.3));
+  if (S >= 1.95 && S < 3.2) P.H = 0;
+  // temperature of the billet
+  if (S < 1.6) P.hot = 1;
+  else if (S < 3.2) P.hot = 1 - ease((S - 1.6) / 0.3);
+  else if (S < 3.9) P.hot = 1;
+  else if (S < 5.4) P.hot = 1 - ease((S - 3.86) / 0.22);
+  else if (S < 7.4) P.hot = 0.8 * ease((S - 5.5) / 0.4) * (1 - ease((S - 6.35) / 0.4));
+  else P.hot = 0.32 * ease((S - 7.45) / 0.5);
+  // powder heap
+  P.mz = 0.1; P.mr = 0.55;
+  if (S < 3.25) { P.mx = 1.45; P.mh = 0; P.mr = 0.62; }
+  else if (S < 6.45) { P.mx = 1.45; const gH = ease((S - 3.25) / 0.6); P.mh = 0.42 * gH * (1 - ease((S - 4.6) / 0.4) * (1 - ease((S - 6.2) / 0.25))); P.mr = 0.3 + 0.32 * gH; }
+  else { P.mx = mix(1.45, mix(1.1, 0.0, thorW.v), wProd); P.mh = mix(0.42, mix(0.3, 0.62, thorW.v), wProd) * (1 - ease((S - 7.55) / 0.35)); P.mr = mix(0.62, mix(0.5, 0.78, thorW.v), wProd); P.mz = mix(0.1, mix(0.1, 0.25, thorW.v), wProd); }
+  P.powder = S < 1.5 ? 0 : (S >= 3.2 && S < 3.9 ? 0.9 * P.spray : 0);
+  P.cut = S < 4.4 ? 0.7 : S < 5.05 ? 0.7 - 0.7 * ease((S - 4.45) / 0.5) : 0.7 * ease((S - 5.1) / 0.35);
+  P.ring = ease((S - 5.55) / 0.4) * (1 - ease((S - 6.35) / 0.3));
+  P.rough = 1 - 0.45 * ease((S - 6.4) / 0.4);
+  P.tint = ease((S - 3.95) / 0.3) * (1 - ease((S - 6.4) / 0.3));
+  P.haze = Math.max(P.spray, P.hot * 0.35);
+  P.noz = sstep(0.0, 0.25, P.len + P.spray);
+  // scrap poses (visible between chapter 1 and the start of the spray)
+  if (HERO_RING && S < 1.2) {             // hero variant: the mark holds, then opens into the process on the way to 1932
+    const intro = REDUCED ? 1 : ease(ti / 1.1);
+    P.ring = Math.max(P.ring, (1 - ease((S - 0.25) / 0.45)) * intro);
+    P.len = ease((S - 0.45) / 0.4); P.spray = ease((S - 0.75) / 0.25);
+    const dot = 1;                                           // the glowing dot is there from the start (a rising variant showed the turntable as a grey disc)
+    P.H = 1.3 * dot; P.hot = (0.8 + 0.2 * P.spray) * Math.min(1, dot * 2.2);   // it rises already glowing P.powder = 0; P.ped = dot;
+    P.haze = Math.max(P.spray, P.hot * 0.35);
+    P.noz = sstep(0.0, 0.25, P.len + P.spray);
+  }
+  P.scr = SCR.map((d, i) => {
+    let w = 0, y = FLOOR_Y + d.rest * d.s, spin = 0, lift = 0;
+    if (S > 1.6 && S < 3.3) {
+      const f = clamp((S - 1.62 - i * 0.05) / 0.22);
+      w = f > 0 ? 1 : 0;
+      y += 3.8 * (1 - f) * (1 - f) + (f > 0.8 ? 0.16 * Math.sin(Math.PI * (f - 0.8) / 0.2) : 0);
+      spin = (1 - f) * 2.6;
+      if (S > 3) { lift = ease((S - 3.01 - i * 0.02) / 0.12); y += lift * 5.2; spin += lift * 3; }
+      if (lift >= 0.999) w = 0;
+    }
+    return { w, y, spin };
+  });
+  return P;
+}
+
+// ---------- labels (duality) ----------
+const olabs = $$('.olab');
+const tmpV = new THREE.Vector3();
+function placeLabels(S) {
+  const vis = sstep(3.93, 4.02, S) * (1 - sstep(4.3, 4.4, S));
+  const pts = [[0, FLOOR_Y, 1.35], [1.45, FLOOR_Y, 1.35]];
+  olabs.forEach((el, i) => {
+    tmpV.set(...pts[i]).project(persp);
+    const x = (tmpV.x * 0.5 + 0.5) * innerWidth, y = (-tmpV.y * 0.5 + 0.5) * innerHeight;
+    el.style.opacity = vis.toFixed(3);
+    if (vis < 0.001) { el.style.transform = 'translate3d(0,0,0)'; return; }   // parked while hidden: off-screen projections widened the document
+    el.style.transform = `translate3d(${x.toFixed(1)}px, ${(y + 10 + (1 - vis) * 14).toFixed(1)}px, 0)`;
+  });
+}
+const steps3 = $$('.steps3 li'), pbar = $('.pbar i');
+
+// ---------- loop ----------
+const rail = $$('.am-rail b');
+let clock = 0, last = performance.now(), Scur = 0, Sprev = 0, tStart = null, frameN = 0, fpsAcc = 0, fpsN = 0, fpsShown = 0;
+const paperC = new THREE.Color();
+const FORCE = typeof window.__FORCE_S === 'number' ? window.__FORCE_S : null;
+const lookM = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0), right = new THREE.Vector3(1, 0, 0), upv = new THREE.Vector3(0, 1, 0);
+const curEl = matchMedia('(hover:hover) and (pointer:fine)').matches && !MOBILE ? $('.am-cur') : null, curPos = { x: -99, y: -99 };
+const curLabel = curEl ? curEl.querySelector('span') : null;
+if (curEl) document.body.classList.add('cur');
+const camTgt = new THREE.Vector3(), vA = new THREE.Vector3(), vB = new THREE.Vector3(), focP = new THREE.Vector3();
+let adaptT = 0, adaptFrames = 0, lastNav = '', spin = 0, flare = 0, stepOn = -1;
+
+function lerpStage(S) {
+  const i = Math.min(Math.floor(S), STAGES.length - 1), j = Math.min(i + 1, STAGES.length - 1);
+  const A = STAGES[i], B = STAGES[j];
+  const e = i === j ? 0 : ease((S - i - A.hold) / (1 - A.hold));
+  return { A, B, e, i };
+}
+
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt;
+  if (tStart === null) tStart = clock + 0.7;
+  const tIntro = clock - tStart;
+  const inst = FORCE !== null;
+
+  const St = inst ? FORCE : stageFromScroll();
+  Scur += (St - Scur) * (1 - Math.exp(-dt * (inst ? 60 : 5.5)));
+  const S = Scur;
+  const vel = Math.abs(S - Sprev) / Math.max(dt, 1e-3); Sprev = S;
+
+  // product + grain targets
+  const kk = inst ? 1 : 1 - Math.exp(-dt * 4);
+  odinW.v += ((prodSel === 0 ? 1 : 0) - odinW.v) * kk; thorW.v = 1 - odinW.v;
+  grainCur += (grainT - grainCur) * (inst ? 1 : 1 - Math.exp(-dt * 10));
+  U.uGrain.value = grainCur;
+
+  // camera
+  const { A, B, e, i: si } = lerpStage(S);
+  vA.fromArray(A.cam).lerp(vB.fromArray(B.cam), e); camPos.copy(vA);
+  vA.fromArray(A.tgt).lerp(vB.fromArray(B.tgt), e); camTgt.copy(vA);
+  focP.fromArray(A.foc).lerp(vB.fromArray(B.foc), e);
+  const fov = mix(A.fov, B.fov, HERO_ZOOM && si === 0 ? 1 - (1 - e) * (1 - e) : e);
+  const heroW = HERO_ZOOM && si === 0 ? 1 - e : 0;   // weight of the zoomed ring hero (lens above opens ahead of the swing = pull-back)
+  ptr.sx += ((ptr.has ? ptr.x : 0) - ptr.sx) * (1 - Math.exp(-dt * 3));
+  ptr.sy += ((ptr.has ? ptr.y : 0) - ptr.sy) * (1 - Math.exp(-dt * 3));
+  const dist = camPos.distanceTo(camTgt);
+  lookM.lookAt(camPos, camTgt, up);
+  right.setFromMatrixColumn(lookM, 0); upv.setFromMatrixColumn(lookM, 1);
+  const calm = mix(1, 0.12, heroW);           // zoomed hero: the narrow lens magnifies the parallax orbit, so the arch would swing with the mouse
+  const par = 0.045 * dist * calm;
+  camPos.addScaledVector(right, ptr.sx * par + Math.sin(clock * 0.31) * 0.01 * dist * calm).addScaledVector(upv, ptr.sy * par * 0.6 + Math.sin(clock * 0.23 + 1) * 0.007 * dist * calm);
+  lookM.lookAt(camPos, camTgt, up);
+  camRot.setFromMatrix4(lookM);
+  tanF = Math.tan(fov * Math.PI / 360);
+  U.uCamPos.value.copy(camPos); U.uCamRot.value.copy(camRot); U.uTanF.value = tanF;
+  persp.position.copy(camPos); persp.quaternion.setFromRotationMatrix(lookM); persp.fov = fov; persp.updateProjectionMatrix(); persp.updateMatrixWorld();
+
+  // look
+  paperC.copy(A.paper).lerp(B.paper, e);
+  U.uPaper.value.copy(paperC);
+  U.uKey.value = mix(A.key, B.key, e);
+  U.uDark.value = mix(A.dark, B.dark, e);
+  const lumP = lum0(paperC);
+
+  // scene
+  const P = sceneState(S, clock, inst ? 10 : tIntro);
+  flare += (Math.min(vel * 0.25, 0.8) - flare) * (1 - Math.exp(-dt * 3)); flare *= Math.exp(-dt * 0.8);
+  spin += dt * 0.9;
+  U.uBilH.value = P.H; U.uHot.value = P.hot; U.uCut.value = P.cut; U.uRough.value = P.rough; U.uSpin.value = spin;
+  U.uDep.value = P.spray; U.uHaze.value = P.haze; U.uNoz.value = P.noz; U.uTint.value = P.tint; U.uPed.value = P.ped === undefined ? 1 : P.ped;
+  const yNoz = Y_NOZ + (1 - P.noz) * 2.2;
+  const yBot = mix(yNoz, Y_ATOM, P.len);
+  U.uStr.value.set(0, yNoz, yBot, P.len > 0.01 ? 0.034 * (1 + flare * 0.25) : 0);
+  U.uMound.value.set(P.mx, P.mz, P.mh, P.mr);
+  const top = Y_B + P.H;
+  U.uGlowA.value.set(0, Y_ATOM, 0, 3.2 * P.spray * P.len * (1 + flare * 0.6));
+  U.uGlowB.value.set(0, top + 0.05, 0, (P.H > 0.05 ? 2.4 * P.hot : 0) + 1.2 * P.spray);
+  U.uSB.value.set(0.2, -0.3, 0.35, 2.6);
+
+  // scrap: base pose + drag + feed
+  P.scr.forEach((sp, i) => {
+    const d = SCR[i];
+    d.pos.set(d.x, sp.y, d.z);
+    if (drag && drag.d === d && ptr.has) {
+      const rd = rayFromNDC(ptr.x, ptr.y);
+      const tgtP = camPos.clone().addScaledVector(rd, drag.depth).sub(drag.grab);
+      const want = tgtP.sub(d.pos); want.y = Math.max(want.y, 0);
+      d.vel.addScaledVector(want.sub(d.off), dt * 140).multiplyScalar(Math.exp(-dt * 12));
+    } else d.vel.addScaledVector(d.off, -dt * 60).multiplyScalar(Math.exp(-dt * 6));
+    d.off.addScaledVector(d.vel, dt);
+    if (!drag || drag.d !== d) { if (d.off.y < 0) { d.off.y = 0; d.vel.y *= -0.35; } }
+    d.pos.add(d.off);
+    let w = sp.w;
+    const tf = clock - d.fedT;
+    if (tf >= 0 && tf < 3.2) {                 // fed: flies up into the melt, comes back later as the next batch
+      if (tf < 0.9) { d.pos.y += tf * tf * 9; spin += 0; }
+      else if (tf < 2.4) w = 0;
+      else { const f = clamp((tf - 2.4) / 0.6); d.off.set(0, 0, 0); d.vel.set(0, 0, 0); d.pos.y = FLOOR_Y + d.rest * d.s + 3.8 * (1 - f) * (1 - f); }
+      if (tf < 0.9) w *= 1 - sstep(0.6, 0.9, tf);
+    }
+    d.w = w;
+    const wob = d.drag ? Math.sin(clock * 3) * 0.15 + d.vel.x * 0.2 : 0;
+    eul.set(d.lie[0] + sp.spin * 0.7 + wob, d.yaw + sp.spin + d.off.x * 0.6, d.lie[2] + sp.spin * 0.4 - d.off.x * 0.3);
+    m4.makeRotationFromEuler(eul); m3.setFromMatrix4(m4).transpose();
+    U.uScrR.value[i].copy(m3);
+    U.uScr.value[i].set(d.pos.x, d.pos.y, d.pos.z, w > 0.01 ? d.s * (0.6 + 0.4 * w) : 0);
+  });
+
+  // sparks
+  SPU.uA.value.set(0, Y_ATOM, 0); SPU.uTopY.value = Math.max(top, Y_B); SPU.uSpray.value = P.spray * P.len; SPU.uRing.value = P.ring;
+  SPU.uPowder.value = P.powder; SPU.uFlare.value = flare;
+  // zoomed ring hero: far camera + narrow lens (little perspective, so the column stays below the fold); sparks keep their world size
+  // (hw is written for fov ~30) scaled by HERO_SPK, the shutter shortens so the ring does not smear, and the extra sparks fade out as it zooms back
+  SPU.uHeroX.value = heroW; SPU.uSpk.value = mix(1, HERO_SPK * 0.268 / tanF, heroW); SPU.uShutter.value = mix(1 / 30, 1 / 90, heroW);
+  SPU.uRingC.value.set(0, HERO_RING && S < 1.2 ? Y_B + 1.38 : top + 0.08, 0, HERO_RING && S < 1.2 ? mix(1.5, 1.3, sstep(0.2, 1.0, S)) : 1.3); SPU.uMP.value.set(P.mx, FLOOR_Y + Math.max(P.mh, 0.05) * 0.8, P.mz);
+  SPU.uBurst.value.set(burstP.x, burstP.y, burstP.z, clock >= burstT ? clock - burstT : -1);
+  DUSTU.uWarm.value = clamp(1 - lumP * 3.5, 0, 1);
+
+  // wall print
+  let word = A.word || B.word, tA = mix(A.text, B.text, B.text < A.text ? sstep(0, 0.35, e) : sstep(0.6, 1, e));
+  if (e > 0.5 && B.word) word = B.word; if (e <= 0.5 && A.word) word = A.word;
+  if (S > 6.5 && S < 7.6) word = prodWord;
+  if (word) drawWall(word);
+  if (NARROW) tA *= 1 - sstep(0.4, 0.8, S);
+  U.uTextA.value = tA;
+  const wallD = Math.abs(camPos.z + 2.6) || 8, halfW = Math.tan(fov * Math.PI / 360) * wallD * persp.aspect;
+  const Wt = Math.min(halfW * 2 * (NARROW ? 0.94 : 0.78), 5.8) * (NARROW ? 1 : mix(A.tw || 1, B.tw || 1, e)), Ht = Wt / 2, cy = NARROW ? 1.55 : 0.72, tx = NARROW ? 0 : mix(A.tx || 0, B.tx || 0, e);
+  U.uTextRect.value.set(tx - Wt / 2, cy - Ht / 2, tx + Wt / 2, cy + Ht / 2);
+  const light = lumP > 0.3;
+  U.uInk.value.setRGB(...(light ? [0.2, 0.19, 0.18] : [0.42, 0.4, 0.38]));
+  U.uInkGlow.value = light ? 0 : 0.012;
+  U.uFlag.value = clamp((lumP - 0.15) * 2.5);
+
+  // touch: heat on the billet, sparks lean toward the cursor, drag scrap
+  let dentW = 0, overObj = '', ptrW = 0;
+  ptr.vx *= Math.exp(-dt * 6); ptr.vy *= Math.exp(-dt * 6);
+  if (ptr.has && !REDUCED && !ptr.over) {
+    const rd = rayFromNDC(ptr.x, ptr.y);
+    const spd = Math.hypot(ptr.vx, ptr.vy);
+    const hs = drag ? null : hitScrap(rd);
+    const hb = hs || drag ? null : hitBillet(rd);
+    if (hs) overObj = 'drag';
+    if (hb) {
+      overObj = 'heat';
+      U.uDent.value.x = hb.p.x; U.uDent.value.y = hb.p.y; U.uDent.value.z = hb.p.z;
+      dentW = 0.3 + Math.min(spd * 0.05, 0.18);
+      if (spd > 0.2 && clock - heatT > 0.05) { heatAt(hb.p, Math.min(0.16 + spd * 0.08, 0.42)); heatT = clock; }
+    }
+    if (P.ring > 0.5 && rd.y < -0.2) {         // ring seen from above: cursor on the ring plane, fast passes strike it
+      const RC = SPU.uRingC.value, th = (RC.y - camPos.y) / rd.y;
+      const hp = camPos.clone().addScaledVector(rd, th);
+      if (hitPrev.has) hitVel.lerp(hp.clone().sub(hitPrev.p).divideScalar(Math.max(dt, 1 / 240)), 0.5);
+      hitPrev.p.copy(hp); hitPrev.has = true;
+      const onRing = Math.abs(Math.hypot(hp.x, hp.z) - RC.w) < 0.32, hv = Math.hypot(hitVel.x, hitVel.z);
+      if (onRing && hv > 1.2 && clock - hitT > 0.09) {
+        const k = Math.min(0.18 + hv * 0.06, 0.7), n = hitN++ % 3;
+        SPU.uHitP.value[n].set(hp.x, RC.y, hp.z, clock);
+        SPU.uHitV.value[n].set(hitVel.x / hv, 0, hitVel.z / hv, k);
+        hitT = clock;
+      }
+    } else hitPrev.has = false;
+    if ((P.spray > 0.05 || P.ring > 0.05) && heroW < 0.5) {     // sparks bend toward the cursor (not in the zoomed hero: there the cursor strikes)
+      const tt = Math.max((0 - camPos.z) / rd.z, 0.5);
+      const wp = camPos.clone().addScaledVector(rd, Math.min(tt, 14));
+      const cy2 = P.ring > 0.5 ? top : (Y_ATOM + top) * 0.5;
+      const dd = Math.hypot(wp.x, (wp.y - cy2) * 0.6, wp.z);
+      ptrW = sstep(2.4, 0.6, dd) * Math.max(P.spray, P.ring);
+      SPU.uPtrW.value.x = wp.x; SPU.uPtrW.value.y = wp.y; SPU.uPtrW.value.z = wp.z;
+    }
+  }
+  if (drag) overObj = 'drag';
+  U.uDent.value.w += (dentW - U.uDent.value.w) * (1 - Math.exp(-dt * 10));
+  SPU.uPtrW.value.w += (ptrW - SPU.uPtrW.value.w) * (1 - Math.exp(-dt * 5));
+  heat.forEach((h, n) => { U.uHeat.value[n].set(h.p.x, h.p.y, h.p.z, clock - h.t0); U.uHeatA.value[n] = h.a; });
+  for (let n = heat.length; n < NHEAT; n++) { U.uHeat.value[n].w = -1; U.uHeatA.value[n] = 0; }
+  while (heat.length && clock - heat[0].t0 > 4) heat.shift();
+
+  if (curEl) {
+    curPos.x += (ptr.cx - curPos.x) * (1 - Math.exp(-dt * 22)); curPos.y += (ptr.cy - curPos.y) * (1 - Math.exp(-dt * 22));
+    curEl.style.transform = `translate3d(${curPos.x.toFixed(1)}px, ${curPos.y.toFixed(1)}px, 0)`;
+    curEl.classList.toggle('obj', !!overObj && !drag); curEl.classList.toggle('hold', !!drag); curEl.classList.toggle('link', ptr.over);
+    if (overObj && curLabel.textContent !== overObj) curLabel.textContent = overObj;
+  }
+
+  U.uTime.value = REDUCED ? clock * 0.35 : clock;
+
+  // focus + post
+  FOCUS.value += (camPos.distanceTo(focP) - FOCUS.value) * (inst ? 1 : 1 - Math.exp(-dt * 6));
+  dof.uniforms.uAp.value = mix(A.ap, B.ap, e);
+  lens.uniforms.uVig.value = mix(mix(0.42, 0.26, clamp(lumP * 2.5)), 0.52, U.uDark.value);
+  renderer.toneMappingExposure = mix(light ? 0.92 : 1.05, 1.2, U.uDark.value);
+  bloom.strength = light ? 0.24 : mix(0.46, 0.55, U.uDark.value);
+  bloom.threshold = light ? 1.6 : 0.95;
+
+  // screen-space heat shimmer above the deposit
+  if (P.haze > 0.01 && P.H > 0.05) {
+    tmpV.set(0, top + 0.05, 0).project(persp); const hx = tmpV.x * 0.5 + 0.5, hyl = tmpV.y * 0.5 + 0.5;
+    tmpV.set(0, top + 1.9, 0).project(persp); const hyh = tmpV.y * 0.5 + 0.5;
+    tmpV.set(R_B * 1.5, top, 0).project(persp); const hw = Math.abs(tmpV.x * 0.5 + 0.5 - hx);
+    lens.uniforms.uHz.value.set(hx, hyl, hyh, (REDUCED ? 0.3 : 1) * P.haze); lens.uniforms.uHzW.value = Math.max(hw, 0.01);
+  } else lens.uniforms.uHz.value.w = 0;
+  lens.uniforms.uStreak.value = light ? 0 : 1;
+
+  // process chapter UI
+  const u3 = clamp(S - 3);
+  const on = S < 3.02 || S > 3.95 ? -1 : u3 < 0.15 ? 0 : u3 < 0.3 ? 1 : 2;
+  if (on !== stepOn) { steps3.forEach((li, n) => li.classList.toggle('on', n === on || (on === 2 && n < 2 && false))); stepOn = on; }
+  if (pbar) pbar.style.transform = `scaleX(${clamp((S - 3) / 0.86).toFixed(3)})`;
+  placeLabels(S);
+  const cur = Math.round(S); rail.forEach((b, n) => b.classList.toggle('on', n === cur));
+  const navCol = lumP > 0.28 ? '#15130f' : '#ffffff';
+  if (navCol !== lastNav) { document.documentElement.style.setProperty('--nav', navCol); lastNav = navCol; }
+
+  composer.render(dt);
+
+  frameN++; fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5) { fpsShown = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
+  adaptT += dt; adaptFrames++;
+  if (adaptT > 2.0 && !inst) {
+    const f = adaptFrames / adaptT; adaptT = 0; adaptFrames = 0;
+    if (f < 40 && quality > 0.5) { quality = Math.max(0.5, quality * 0.82); resize(); }
+    else if (f > 58 && quality < Math.min(devicePixelRatio, 1.25) - 0.05 && !MOBILE) { quality = Math.min(Math.min(devicePixelRatio, 1.25), quality * 1.1); resize(); }
+  }
+  if (frameN === 3) { markReady(); document.body.dataset.ready = '1'; }
+  requestAnimationFrame(frame);
+}
+
+let lastY = 0; const nav = $('.am-nav');
+addEventListener('scroll', () => { const y = scrollY; if (Math.abs(y - lastY) > 6) { nav.classList.toggle('away', y > lastY && y > 120); lastY = y; } }, { passive: true });
+window.__MI = { U, SPU, stage: () => Scur, fps: () => fpsShown, quality: () => quality, keys: () => keys, scrap: SCR, heat };
+
+addEventListener('resize', resize);
+(document.fonts && document.fonts.load ? Promise.all([document.fonts.load(`800 200px ${FONT}`), document.fonts.ready]) : Promise.resolve())
+  .catch(() => {}).then(() => {
+    resize();
+    drawWall('ASGAARD');
+    if (FORCE !== null) { scrollTo(0, scrollForStage(FORCE)); Scur = FORCE; tStart = -10; $$('.rv').forEach(el => el.classList.add('in')); }
+    requestAnimationFrame((t) => { last = t; frame(t); });
+  });
+</script>
+</body>
+</html>
