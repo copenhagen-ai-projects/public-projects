@@ -1,0 +1,2201 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Knowledgeboard · Tænk selv. Men ikke alene.</title>
+<meta name="description" content="Pitch dit businesskoncept for et simuleret panel og få en skrevet validering på under et minut.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet">
+<!--
+  Knowledgeboard-boardet - interaktivt koncept (v5, 2026-09-26)
+  Motor: render-studio (skills/ui-design/render-studio). Hele siden er en live raymarchet vaeskedraabe
+  i et lyst avispapir-studie. Pitcher man en idé, flyver ordene ind i draaben, et vaern tjekker indholdet,
+  11 anonyme roller vaelges til netop den pitch, stolene rejser sig, og panelet arbejder i tre tidsstyrede
+  kapitler, der ender i en skreven valideringsrapport.
+  Backend: /api/health og /api/board (Vercel-functions, lib/board.mjs) med OpenRouter-noeglen i miljoeet.
+  Uden noegle: forudindspillet demo.
+  Debug: window.__FORCE_ROOM = 'council'|'debate'|'chapter'|'press'|'verdict'|'reject'
+-->
+<style>
+:root{
+  --pad: clamp(20px, 4.6vw, 72px);
+  --ease: cubic-bezier(.16,1,.3,1);
+  --paper:#f5f1e8; --paper2:#fbf9f4; --ink:#141414; --ink2:#34363b; --mute:#6c6a64; --rule:#d9d2c2;
+  --navy:#0f2a4a; --accent:#b3121f;
+  --serif:"Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans:"Libre Franklin", "Helvetica Neue", Arial, sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+html,body{height:100%;overflow:hidden}
+body{margin:0;background:#d9d2c3;color:var(--ink);font-family:var(--sans);font-weight:400}
+body.nogl{background:radial-gradient(120% 90% at 50% 30%,#f3eee3 0%,#ddd5c5 70%) fixed}
+a{color:inherit}
+button,input,textarea{font:inherit;color:inherit}
+#gl{position:fixed;inset:0;width:100vw;height:100vh;height:100lvh;z-index:0;display:block}
+main{position:relative;z-index:1}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.kick{font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+
+/* ---------- loader ---------- */
+#kb-load{position:fixed;inset:0;z-index:60;background:var(--paper);display:grid;place-items:center;transition:opacity 1.1s var(--ease),visibility 1.1s}
+#kb-load span{font-family:var(--serif);font-weight:700;font-size:22px;letter-spacing:-.01em;color:var(--ink)}
+#kb-load i{display:block;height:2px;margin-top:12px;background:var(--accent);transform-origin:left;animation:kb-bar 1.6s var(--ease) infinite}
+@keyframes kb-bar{0%{transform:scaleX(0)}60%{transform:scaleX(1)}100%{transform:scaleX(1);opacity:0}}
+body.ready #kb-load{opacity:0;visibility:hidden}
+
+/* ---------- nav (avishoved) ---------- */
+.kb-nav{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;justify-content:space-between;align-items:center;gap:20px;
+  padding:16px var(--pad) 14px;color:var(--ink);pointer-events:none}
+.kb-nav::after{content:"";position:absolute;left:var(--pad);right:var(--pad);bottom:0;height:3px;border-top:1px solid rgba(20,20,20,.55);border-bottom:1px solid rgba(20,20,20,.55);opacity:.55}
+.kb-nav a,.kb-nav button{pointer-events:auto;text-decoration:none}
+.kb-logo{display:flex;align-items:baseline;font-family:var(--serif);font-size:21px;letter-spacing:-.015em}
+.kb-logo b{font-weight:700}.kb-logo span{font-weight:400;font-style:italic}
+.kb-date{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-left:16px;padding-left:16px;border-left:1px solid var(--rule)}
+.kb-l{display:flex;align-items:center}
+.kb-links{display:flex;gap:22px;font-size:13.5px;font-weight:600;align-items:center}
+.kb-links a{position:relative}
+.kb-links a::after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:1px;background:currentColor;transform:scaleX(0);transform-origin:right;transition:transform .5s var(--ease)}
+.kb-links a:hover::after{transform:scaleX(1);transform-origin:left}
+.kb-links .rm{display:none;border:1px solid rgba(20,20,20,.35);border-radius:2px;padding:5px 11px;background:var(--paper2);cursor:pointer;font-size:12.5px;font-weight:600}
+body.room .kb-links .rm{display:inline-block}
+body.room .kb-links a{display:none}
+.kb-links .rm em{font-style:normal;color:var(--accent);margin-left:6px;font-variant-numeric:tabular-nums}
+
+/* ---------- hero ---------- */
+.mi{position:relative;min-height:100vh;padding:0 var(--pad)}
+.kb-hero{display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:clamp(24px,4.6vh,50px)}
+.kb-hero .row{display:grid;grid-template-columns:1fr minmax(0,450px);gap:40px;align-items:end;transition:opacity .9s var(--ease),transform 1.1s var(--ease)}
+body.room .kb-hero .row{opacity:0;transform:translateY(30px);pointer-events:none;visibility:hidden}
+.tagl{font-family:var(--serif);font-weight:700;font-size:clamp(42px,5.6vw,88px);letter-spacing:-.03em;line-height:.96;color:var(--ink)}
+.tagl em{font-style:italic;font-weight:400;color:var(--ink2)}
+.facts{margin-top:18px;font-size:13px;letter-spacing:.02em;color:var(--ink2);font-weight:500}
+.facts b{font-weight:700;color:var(--ink)}
+.facts i{display:inline-block;width:6px;height:6px;background:var(--accent);margin:0 9px 1px;vertical-align:middle}
+.hl{overflow:hidden;display:block}
+.hl > span{display:block;transform:translateY(105%);transition:transform 1.4s var(--ease)}
+body.ready .hl > span{transform:none}
+body.ready .hl.d1 > span{transition-delay:.15s} body.ready .hl.d2 > span{transition-delay:.3s}
+.fadein{opacity:0;transform:translateY(20px);transition:opacity 1.2s var(--ease) .45s,transform 1.2s var(--ease) .45s}
+body.ready .fadein{opacity:1;transform:none}
+
+/* composer */
+.cmp{position:relative;justify-self:end;width:100%;padding:16px 16px 12px;border-radius:3px;background:rgba(251,249,244,.92);
+  border:1px solid rgba(20,20,20,.14);border-top:3px solid var(--ink);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 26px 60px -30px rgba(40,30,10,.45)}
+.cmp label{display:flex;justify-content:space-between;align-items:baseline;margin:0 1px 9px}
+.cmp label em{font-style:normal;letter-spacing:0;text-transform:none;font-weight:500;color:var(--mute);font-variant-numeric:tabular-nums;font-size:12px}
+#kb-idea{display:block;width:100%;resize:none;border:1px solid rgba(20,20,20,.1);outline:0;background:#fff;border-radius:2px;padding:12px 13px;
+  font-family:var(--serif);font-size:17px;line-height:1.5;color:var(--ink);min-height:96px;max-height:34vh}
+#kb-idea::placeholder,#kb-want::placeholder{color:#8f8b82}
+#kb-idea:focus,#kb-want:focus{border-color:var(--navy);box-shadow:0 0 0 2px rgba(15,42,74,.12)}
+#kb-want{display:block;width:100%;margin-top:8px;height:40px;border:1px solid rgba(20,20,20,.1);outline:0;background:#fff;border-radius:2px;padding:0 13px;font-size:14px;color:var(--ink)}
+.cmp .row2{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.eng{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;padding:4px 2px;font-size:12.5px;font-weight:500;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.eng:hover{color:var(--ink)}
+.eng i{width:7px;height:7px;border-radius:50%;background:#aaa}
+.eng[data-mode="live"] i{background:#1f8a5b;box-shadow:0 0 0 3px rgba(31,138,91,.18)}
+.eng[data-mode="demo"] i{background:#c08a2b}
+.btn{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;padding:12px 18px;border-radius:2px;border:0;background:var(--ink);color:#fff;
+  text-decoration:none;font-weight:600;font-size:14.5px;cursor:pointer;transition:transform .5s var(--ease),background .3s}
+.btn:hover{transform:translateY(-1px);background:var(--navy)}
+.cmp .fine{margin:10px 1px 0;font-size:12px;line-height:1.45;color:var(--mute)}
+#kb-reject{position:absolute;left:-1px;right:-1px;bottom:calc(100% + 10px);padding:14px 16px 12px;background:var(--paper2);border:1px solid rgba(20,20,20,.14);border-left:4px solid var(--accent);
+  box-shadow:0 20px 50px -24px rgba(40,30,10,.5);display:none}
+#kb-reject.on{display:block;animation:rm-in .45s var(--ease) both}
+#kb-reject b{display:block;font-family:var(--serif);font-weight:700;font-size:19px;margin:4px 0 4px}
+#kb-reject p{margin:0;font-size:14px;line-height:1.5;color:var(--ink2)}
+#kb-reject button{margin-top:10px;height:30px;padding:0 12px;border:1px solid rgba(20,20,20,.25);background:#fff;border-radius:2px;font-size:12.5px;font-weight:600;cursor:pointer}
+
+/* ---------- cursor ---------- */
+.kb-cur{position:fixed;left:0;top:0;z-index:70;pointer-events:none;width:0;height:0}
+.kb-cur i{position:absolute;left:-4px;top:-4px;width:8px;height:8px;border-radius:50%;background:#fff;mix-blend-mode:difference}
+.kb-cur b{position:absolute;left:-19px;top:-19px;width:38px;height:38px;border-radius:50%;border:1.5px solid rgba(255,255,255,.9);mix-blend-mode:difference;transition:transform .45s var(--ease),opacity .3s}
+.kb-cur span{position:absolute;left:30px;top:-7px;font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#fff;mix-blend-mode:difference;opacity:0;transition:opacity .3s;white-space:nowrap}
+.kb-cur.drop b{transform:scale(1.9)} .kb-cur.drop span{opacity:.9}
+.kb-cur.hold b{transform:scale(.7)}
+.kb-cur.link b{transform:scale(1.35);opacity:.5}
+@media (hover:hover) and (pointer:fine){ body.cur, body.cur a, body.cur button{cursor:none} body.cur textarea, body.cur input{cursor:text} }
+
+/* ---------- rummet ---------- */
+#rm-seats{position:fixed;inset:0;z-index:8;pointer-events:none}
+.seatlab{position:absolute;left:0;top:0;width:170px;margin-left:-85px;text-align:center;opacity:0;will-change:transform,opacity;color:var(--ink);
+  text-shadow:0 0 10px rgba(245,241,232,.95),0 0 3px rgba(245,241,232,.9)}
+.seatlab b{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-weight:600;font-size:10px;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;color:var(--ink2);transition:color .4s}
+.seatlab b::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--c)}
+.seatlab u{display:inline-block;text-decoration:none;margin-top:4px;padding:2px 7px 1px;border-radius:2px;font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;text-shadow:none;
+  background:rgba(255,255,255,.8);opacity:0;transform:translateY(4px);transition:opacity .5s,transform .6s var(--ease)}
+.seatlab u.on{opacity:1;transform:none}
+.seatlab u.for{background:#dcebe1;color:#1f5c3d}
+.seatlab u.imod{background:#f3dcd9;color:#8e1520}
+.seatlab u.betinget{background:#dde4ee;color:#1f3a5f}
+.seatlab.speaking b{color:var(--ink)}
+.seatlab.speaking b::before{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 22%,transparent)}
+.seatlab > div{display:block}
+@keyframes rm-dot{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+
+#rm-status{position:fixed;left:var(--pad);top:74px;transform:translate(0,-8px);z-index:32;display:flex;align-items:center;gap:10px;padding:6px 6px 6px 14px;border-radius:2px;
+  background:rgba(251,249,244,.92);border:1px solid rgba(20,20,20,.14);font-size:13px;box-shadow:0 12px 30px -18px rgba(40,30,10,.5);
+  opacity:0;pointer-events:none;transition:opacity .6s var(--ease),transform .7s var(--ease);max-width:calc(100% - 32px)}
+body.room #rm-status.on{opacity:1;transform:translate(0,0);pointer-events:auto}
+#rm-status .pulse{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;animation:rm-pulse 1.6s ease-in-out infinite}
+@keyframes rm-pulse{50%{opacity:.3;transform:scale(.7)}}
+#rm-status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+#rm-status button{height:28px;padding:0 12px;border-radius:2px;border:1px solid rgba(20,20,20,.2);background:#fff;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap}
+#rm-status button:hover{background:var(--paper)}
+
+.fly{position:fixed;left:0;top:0;z-index:40;pointer-events:none;font-family:var(--serif);font-size:17px;color:var(--ink);white-space:nowrap;will-change:transform,opacity}
+
+#rm-bubs{position:fixed;inset:0;z-index:37;pointer-events:none}
+.bub{position:absolute;left:0;top:0;width:max-content;max-width:min(300px,34vw);padding:13px 18px 15px 26px;border-radius:5px;
+  background:#fffdf9;border:1px solid rgba(30,24,12,.07);
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 1px 2px rgba(40,30,10,.06),0 10px 18px -10px rgba(40,30,10,.18),0 28px 50px -26px rgba(40,30,10,.38);
+  opacity:0;transform-origin:50% 100%;will-change:transform,opacity;transition:opacity .45s var(--ease)}
+.bub.on{opacity:1}
+.bub::after{content:"";position:absolute;left:var(--tx,50%);bottom:-6px;width:11px;height:11px;margin-left:-5.5px;transform:rotate(45deg);border-radius:0 0 2px 0;
+  background:#fffdf9;border-right:1px solid rgba(30,24,12,.07);border-bottom:1px solid rgba(30,24,12,.07);box-shadow:3px 3px 6px -3px rgba(40,30,10,.14)}
+.bub .who{display:flex;flex-wrap:wrap;align-items:baseline;gap:1px 7px;font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;line-height:1.4;color:var(--ink)}
+.bub .who .dt{position:absolute;left:12px;top:18px;width:6px;height:6px;border-radius:50%;background:var(--c)}
+.bub .who b{font-weight:600}
+.bub .who em{font-family:var(--serif);font-style:italic;font-size:12.5px;letter-spacing:0;text-transform:none;font-weight:400;color:var(--mute)}
+.bub .who em span{color:var(--tc);font-weight:600;font-style:normal;font-family:var(--sans);font-size:10px;letter-spacing:.11em;text-transform:uppercase}
+.bub q{position:relative;display:block;quotes:none;font-family:var(--serif);font-optical-sizing:auto;font-weight:400;font-size:17px;line-height:1.4;letter-spacing:-.003em;margin-top:7px;color:#1b1b1d;text-wrap:pretty}
+.bub q::before{content:"\201C";position:absolute;left:-17px;top:-6px;font-size:32px;line-height:1;font-weight:600;color:var(--c)}
+.bub q .w{display:inline-block;white-space:nowrap;opacity:0;transform:translateY(4px);filter:blur(2px);animation:rm-word .5s var(--ease) forwards}
+@keyframes rm-word{to{opacity:1;transform:none;filter:blur(0)}}
+.bub.think{padding:8px 11px;max-width:none;border-radius:20px}
+.bub.think::after{display:none}
+.bub.think q{display:none}.bub.think .who{display:none}
+.bub .dots{display:none;gap:4px;height:6px;align-items:center}
+.bub.think .dots{display:inline-flex}
+.bub .dots i{width:5px;height:5px;border-radius:50%;background:var(--c);animation:rm-dot 1.2s ease-in-out infinite}
+.bub .dots i:nth-child(2){animation-delay:.15s}.bub .dots i:nth-child(3){animation-delay:.3s}
+#rm-sim{position:fixed;left:var(--pad);bottom:20px;z-index:32;font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);opacity:0;transition:opacity .8s}
+body.room #rm-sim{opacity:1}
+body.room.verd #rm-sim{opacity:0}
+#rm-card{position:fixed;z-index:45;width:min(370px,calc(100% - 32px));padding:18px 18px 14px;border-radius:2px;background:var(--paper2);color:var(--ink);
+  border:1px solid rgba(20,20,20,.14);border-top:3px solid var(--c);box-shadow:0 30px 70px -26px rgba(40,30,10,.6);display:none;--c:var(--ink)}
+#rm-card.on{display:block;animation:rm-in .45s var(--ease) both}
+@keyframes rm-in{from{opacity:0;transform:translateY(10px)}}
+#rm-card .hd{display:flex;align-items:center;gap:10px}
+#rm-card .hd i{width:11px;height:11px;border-radius:50%;background:var(--c)}
+#rm-card .hd b{font-family:var(--serif);font-weight:700;font-size:20px}
+#rm-card .lensl{font-size:12px;color:var(--mute);margin-top:3px}
+#rm-card .tk{font-size:13.5px;color:var(--ink2);margin-top:8px;font-style:italic;font-family:var(--serif)}
+#rm-card q{display:block;quotes:none;font-family:var(--serif);font-weight:600;font-size:18px;line-height:1.3;margin:6px 0 4px}
+#rm-card h4{margin:12px 0 4px;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+#rm-card ul{margin:0;padding-left:17px;font-size:14px;line-height:1.5}
+#rm-card p{margin:0;font-size:14px;line-height:1.5}
+#rm-card .x{position:absolute;right:12px;top:12px}
+.x{width:30px;height:30px;border-radius:50%;border:1px solid rgba(20,20,20,.2);background:#fff;cursor:pointer;display:grid;place-items:center;font-size:16px;line-height:1}
+
+#rm-log{position:fixed;top:0;right:0;bottom:0;z-index:50;width:min(420px,100%);display:flex;flex-direction:column;background:var(--paper2);color:var(--ink);
+  border-left:1px solid rgba(20,20,20,.14);box-shadow:-30px 0 60px -40px rgba(40,30,10,.6);transform:translateX(102%);transition:transform .7s var(--ease)}
+#rm-log.on{transform:none}
+#rm-log header{display:flex;align-items:center;justify-content:space-between;padding:22px 22px 14px;border-bottom:3px double rgba(20,20,20,.35)}
+#rm-log h3{margin:0;font-family:var(--serif);font-weight:700;font-size:26px}
+#rm-log header p{margin:3px 0 0;font-size:12.5px;color:var(--mute)}
+#rm-list{flex:1;overflow:auto;padding:4px 22px 30px}
+.lg-r{margin:20px 0 6px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.lg{display:grid;grid-template-columns:10px 1fr;gap:4px 10px;padding:11px 0;border-bottom:1px solid var(--rule)}
+.lg i{width:8px;height:8px;border-radius:50%;background:var(--c);margin-top:6px}
+.lg b{font-size:13px;font-weight:700;color:var(--c)}
+.lg b s{text-decoration:none;color:var(--mute);font-weight:500}
+.lg p{grid-column:2;margin:0;font-size:14.5px;line-height:1.5;font-family:var(--serif)}
+.lg ul{grid-column:2;margin:4px 0 0;padding-left:16px;color:var(--ink2);font-size:13px;line-height:1.5}
+
+/* ---------- chatpanel ---------- */
+#rm-chat{position:fixed;right:18px;top:78px;bottom:18px;width:320px;z-index:34;display:flex;flex-direction:column;border-radius:2px;color:var(--ink);
+  background:rgba(251,249,244,.9);border:1px solid rgba(20,20,20,.12);border-top:3px solid var(--ink);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  box-shadow:0 26px 60px -34px rgba(40,30,10,.55);opacity:0;transform:translateX(24px);pointer-events:none;transition:opacity .7s var(--ease),transform .9s var(--ease)}
+body.room.chat #rm-chat{opacity:1;transform:none;pointer-events:auto}
+body.verd #rm-chat,body.verd #chat-pill,body.ch3 #rm-chat,body.ch3 #chat-pill{opacity:0!important;pointer-events:none!important}
+#rm-chat header{display:flex;align-items:center;gap:8px;padding:11px 12px 9px 16px;border-bottom:1px solid var(--rule)}
+#rm-chat header b{font-family:var(--serif);font-weight:700;font-size:17px}
+#rm-chat header span{font-size:11.5px;color:var(--mute);margin-left:auto;font-variant-numeric:tabular-nums}
+#rm-chat header button{width:26px;height:26px;border-radius:50%;border:1px solid rgba(20,20,20,.2);background:#fff;cursor:pointer;line-height:1;font-size:15px}
+#chat-list{flex:1;overflow:auto;padding:4px 14px 16px;scroll-behavior:smooth;mask-image:linear-gradient(to bottom,transparent,#000 14px)}
+.cm{display:grid;grid-template-columns:8px 1fr;gap:3px 9px;padding:11px 0;border-bottom:1px solid rgba(20,20,20,.06);animation:rm-in .5s var(--ease) both}
+.cm i{width:6px;height:6px;border-radius:50%;background:var(--c);margin-top:4px}
+.cm b{font-size:10px;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink)}
+.cm b s{text-decoration:none;font-family:var(--serif);font-style:italic;font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--mute);font-weight:400}
+.cm p{grid-column:2;margin:0;font-family:var(--serif);font-size:14.5px;line-height:1.45;color:#1b1b1d}
+.cm-ch{margin:14px 0 2px;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.cm-pitch{padding:10px 0 8px;font-family:var(--serif);font-style:italic;font-size:13.5px;line-height:1.45;color:var(--ink2);border-bottom:1px solid var(--rule)}
+#chat-pill{position:fixed;right:18px;top:78px;z-index:34;height:32px;padding:0 14px;border-radius:2px;border:1px solid rgba(20,20,20,.2);
+  background:var(--paper2);font-size:13px;font-weight:600;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .5s}
+#chat-pill em{font-style:normal;color:var(--accent);margin-left:6px}
+body.room:not(.chat) #chat-pill{opacity:1;pointer-events:auto}
+body.room.chat:not(.ch3) #rm-ch{left:calc((100% - 338px) / 2)}
+@media (max-width:1000px){ #rm-chat,#chat-pill{display:none} }
+
+/* ---------- kapitler ---------- */
+#rm-scrim{position:fixed;inset:0;z-index:35;pointer-events:none;opacity:0;transition:opacity .9s var(--ease);
+  background:radial-gradient(ellipse 70% 55% at 50% 45%,rgba(245,241,232,.92),rgba(245,241,232,.6) 75%);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+body.chintro #rm-scrim{opacity:1}
+#rm-seats,#rm-bubs{transition:opacity .6s var(--ease)}
+body.chintro #rm-seats,body.chintro #rm-bubs{opacity:0}
+#rm-ch{position:fixed;left:50%;top:50%;z-index:36;width:min(940px,calc(100% - 32px));text-align:center;pointer-events:none;opacity:0;color:var(--ink);
+  transform:translate(-50%,-50%) scale(.96);transition:opacity .7s var(--ease),transform 1.2s var(--ease),top 1.2s var(--ease),left 1s var(--ease)}
+#rm-ch.on{opacity:1}
+#rm-ch.intro{top:46%;transform:translate(-50%,-50%) scale(1)}
+#rm-ch.top{top:68px;transform:translate(-50%,0) scale(1)}
+#rm-ch.top .cq{font-size:clamp(24px,2.2vw,34px);margin-top:6px;letter-spacing:-.022em}
+#rm-ch.top::before{content:"";position:absolute;left:10%;right:10%;top:-30px;bottom:-26px;z-index:-1;background:radial-gradient(closest-side,rgba(240,235,224,.92),rgba(240,235,224,.55) 60%,transparent);pointer-events:none}
+#rm-ch.top .steps{display:none}
+#rm-ch.top .ce{font-size:10.5px}
+#rm-ch.top .cs{display:none}
+#rm-ch.top .bar{margin-top:11px;max-width:260px}
+#rm-ch.top .crow{margin-top:7px;font-size:12.5px}
+#rm-ch .steps{display:flex;justify-content:center;gap:8px;margin-bottom:22px}
+#rm-ch .steps i{width:34px;height:3px;background:rgba(20,20,20,.15);transition:background .6s}
+#rm-ch .steps i.done{background:rgba(20,20,20,.6)}#rm-ch .steps i.now{background:var(--accent)}
+#rm-ch .ce{display:inline-flex;align-items:center;gap:12px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--accent)}
+#rm-ch .ce::before,#rm-ch .ce::after{content:"";width:30px;height:1px;background:currentColor;opacity:.55}
+#rm-ch .cq{transition:font-size 1.2s var(--ease);font-family:var(--serif);font-optical-sizing:auto;font-weight:600;font-size:clamp(42px,5.6vw,88px);line-height:1;letter-spacing:-.032em;margin:14px 0 0;text-wrap:balance;
+  text-shadow:0 0 30px rgba(245,241,232,.9)}
+#rm-ch .cs{margin:18px auto 0;max-width:540px;font-family:var(--serif);font-style:italic;font-size:20px;line-height:1.45;color:var(--ink2);transition:opacity .6s}
+#rm-ch.top .cs{opacity:0}
+#rm-ch .bar{display:flex;gap:4px;justify-content:center;margin:26px auto 0;max-width:420px}
+#rm-ch .bar i{flex:1;height:2px;background:rgba(20,20,20,.14);transition:background .5s,transform .5s var(--ease)}
+#rm-ch .bar i.on{transform:scaleY(1.6)}
+#rm-ch .bar i.on{background:var(--c)}
+#rm-ch .bar.indet i{animation:ch-load 1.4s ease-in-out infinite;background:rgba(20,20,20,.12)}
+#rm-ch .bar.indet i:nth-child(2n){animation-delay:.12s}#rm-ch .bar.indet i:nth-child(3n){animation-delay:.24s}
+@keyframes ch-load{50%{background:var(--c)}}
+#rm-ch .crow{display:flex;justify-content:center;align-items:baseline;gap:14px;margin-top:12px;font-family:var(--serif);font-style:italic;font-size:14.5px;color:var(--ink2);text-shadow:0 0 12px rgba(245,241,232,.9)}
+#rm-ch .ct{font-family:var(--sans);font-style:normal;font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--accent)}
+#rm-ch .ct:empty{display:none}
+#rm-ch.intro .crow{opacity:0}
+#rm-ch button{pointer-events:auto;border:0;background:none;padding:0;font-family:var(--sans);font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);cursor:pointer;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:4px}
+#rm-ch button:hover{color:var(--accent)}
+
+/* ---------- kapitel 3: rapporten saettes ---------- */
+#rm-press{position:fixed;z-index:34;right:clamp(18px,5vw,90px);top:170px;width:min(440px,40vw);padding:22px 24px 20px;background:#fffdf8;color:var(--ink);
+  border:1px solid rgba(20,20,20,.1);box-shadow:0 40px 80px -36px rgba(40,30,10,.6);opacity:0;transform:translateY(30px) rotate(.6deg);pointer-events:none;
+  transition:opacity .9s var(--ease),transform 1.2s var(--ease)}
+#rm-press.on{opacity:1;transform:none}
+.pr-hd{display:flex;align-items:baseline;gap:0;padding-bottom:10px;border-bottom:3px double rgba(20,20,20,.5);font-family:var(--serif);font-size:18px}
+.pr-hd b{font-weight:700}.pr-hd span{font-style:italic}
+.pr-hd em{margin-left:auto;font-family:var(--sans);font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+#rm-press.done .pr-hd em{color:#1f5c3d}
+.pr-h{margin:16px 0 14px}
+.pr-h i,.pr-cols i{display:block;height:10px;margin-top:8px;background:linear-gradient(90deg,#e8e1d2 0%,#f5f0e5 40%,#e8e1d2 80%);background-size:300% 100%;animation:pr-sh 1.6s linear infinite}
+.pr-h i{height:20px}.pr-h i:nth-child(2){width:62%}
+.pr-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pr-cols i:nth-child(3n){width:84%}.pr-cols i:nth-child(4n){width:66%}
+@keyframes pr-sh{to{background-position:-300% 0}}
+#rm-press.done .pr-h i,#rm-press.done .pr-cols i{animation:none;background:#e3dccd}
+.pr-q{margin:18px 0 0;padding:12px 0 0 14px;border-left:3px solid var(--c,var(--ink));min-height:92px;opacity:0;transform:translateY(8px)}
+.pr-q.in{animation:pr-in 2.1s var(--ease) both}
+@keyframes pr-in{0%{opacity:0;transform:translateY(8px)}14%,82%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-6px)}}
+.pr-q span{display:block;font-family:var(--serif);font-size:17px;line-height:1.35}
+.pr-q cite{display:block;margin-top:6px;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c,var(--mute))}
+.pr-v{display:flex;gap:18px;margin-top:16px;padding-top:12px;border-top:1px solid var(--rule);font-size:13px;color:var(--ink2)}
+.pr-v b{font-family:var(--serif);font-size:24px;font-weight:700;color:var(--ink);margin-right:4px;font-variant-numeric:tabular-nums}
+
+/* ---------- rapporten (papir) ---------- */
+#rp{position:fixed;top:0;right:0;bottom:0;z-index:40;width:min(760px,60vw);overflow:auto;padding:84px clamp(18px,3vw,48px) 30px;
+  opacity:0;pointer-events:none;transform:translateY(40px);transition:opacity 1s var(--ease),transform 1.3s var(--ease)}
+#rp.on{opacity:1;pointer-events:auto;transform:none}
+#rp-doc{background:#fffdf8;color:var(--ink);border-radius:1px;padding:40px 48px 34px;box-shadow:0 40px 90px -34px rgba(40,30,10,.6),0 0 0 1px rgba(0,0,0,.05);
+  font-family:var(--serif);font-size:16.5px;line-height:1.6}
+.rp-hd{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding-bottom:12px;border-bottom:3px double var(--ink)}
+.rp-brand{font-size:26px;letter-spacing:-.015em}.rp-brand b{font-weight:700}.rp-brand span{font-style:italic;font-weight:400}
+.rp-meta{text-align:right;font-family:var(--sans);font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);line-height:1.6}
+.rp-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:22px}
+.rp-kick{font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.rp-dom{display:inline-flex;align-items:center;gap:8px;padding:5px 12px 5px 10px;border-radius:2px;font-family:var(--sans);font-size:11.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.rp-dom i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.rp-dom.green{background:#dcebe1;color:#1f5c3d}.rp-dom.cond{background:#dde4ee;color:#1f3a5f}.rp-dom.amber{background:#f3e8cf;color:#7a5413}.rp-dom.red{background:#f3dcd9;color:#8e1520}
+#rp-doc h1{font-family:var(--serif);font-weight:700;font-size:clamp(32px,3.4vw,50px);line-height:1.04;letter-spacing:-.025em;margin:10px 0 14px;text-wrap:balance}
+.rp-lead{font-size:19px;line-height:1.55;color:var(--ink2);margin:0}
+.rp-lead::first-letter{float:left;font-size:3.3em;line-height:.9;font-weight:700;margin:4px 8px 0 0;color:var(--ink)}
+.rp-pitch{margin:24px 0 8px;padding:12px 16px;border-left:3px solid var(--navy);background:rgba(15,42,74,.05);font-family:var(--sans)}
+.rp-pitch small,.rp-crit small{display:block;font-family:var(--sans);font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-top:4px}
+.rp-pitch p{margin:3px 0 6px;font-size:14.5px;color:var(--ink2)}
+#rp-doc h2{display:flex;align-items:baseline;gap:12px;font-family:var(--serif);font-weight:700;font-size:25px;letter-spacing:-.015em;margin:34px 0 10px;padding-top:14px;border-top:2px solid var(--ink)}
+#rp-doc h2 span{font-family:var(--sans);font-size:11px;font-weight:700;color:var(--accent);letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+#rp-doc h3{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:26px 0 8px}
+.rp-card{display:grid;grid-template-columns:28px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.rp-n{font-family:var(--serif);font-size:24px;font-weight:700;color:var(--accent);line-height:1.05}
+.rp-card h5{margin:0;font-size:17.5px;font-weight:700}
+.rp-card p{margin:3px 0 6px}
+.rp-who{display:flex;flex-wrap:wrap;gap:10px;font-family:var(--sans)}
+.wh{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--mute)}
+.wh::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c)}
+.rp-crit{margin-top:12px;padding:16px 20px;background:var(--ink);color:#fffdf8}
+.rp-crit small{color:#f0b8bc}
+.rp-crit div{font-family:var(--serif);font-weight:600;font-size:25px;line-height:1.25;margin-top:6px}
+#rp-doc ol,#rp-doc ul{margin:0;padding-left:20px}#rp-doc li+li{margin-top:5px}
+.rp-tally{display:flex;height:6px;overflow:hidden;background:#ebe5d8}.rp-tally i{display:block}
+.rp-tl{display:flex;gap:16px;font-family:var(--sans);font-size:13px;color:var(--mute);margin:8px 0 6px}.rp-tl b{color:var(--ink)}
+.rp-vt{width:100%;border-collapse:collapse;font-family:var(--sans);font-size:13.5px}
+.rp-vt td{padding:8px 10px 8px 0;border-top:1px solid var(--rule);vertical-align:top;line-height:1.45}
+.rp-vt td:first-child{white-space:nowrap;font-weight:600;width:1%}
+.rp-vt td:first-child i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:8px}
+.rp-vt td.st{text-align:right;width:1%}
+.pill{display:inline-block;padding:2px 8px;border-radius:2px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.pill.for{background:#dcebe1;color:#1f5c3d}.pill.imod{background:#f3dcd9;color:#8e1520}.pill.betinget{background:#dde4ee;color:#1f3a5f}
+.rp-small{font-size:14px;color:var(--ink2)}
+.rp-ft{margin-top:30px;padding-top:12px;border-top:1px solid var(--rule);font-family:var(--sans);font-size:12px;color:var(--mute);line-height:1.5}
+.rp-act{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.ghost{display:inline-flex;align-items:center;height:42px;padding:0 16px;border-radius:2px;border:1px solid rgba(20,20,20,.3);background:rgba(255,253,248,.9);cursor:pointer;font-weight:600;font-size:14px;text-decoration:none;color:var(--ink)}
+.ghost:hover{background:#fff}
+@media print{
+  body *{visibility:hidden!important}
+  #rp,#rp *{visibility:visible!important}
+  #rp{position:absolute;inset:0;width:100%;padding:0;opacity:1;transform:none}
+  #rp-doc{box-shadow:none}
+  .rp-act{display:none}
+}
+#eng-pop{position:fixed;z-index:65;right:var(--pad);bottom:24px;width:min(400px,calc(100% - 32px));padding:18px;border-radius:2px;background:var(--paper2);color:var(--ink);
+  border:1px solid rgba(20,20,20,.14);border-top:3px solid var(--ink);box-shadow:0 30px 70px -26px rgba(40,30,10,.6);display:none}
+#eng-pop.on{display:block;animation:rm-in .4s var(--ease) both}
+#eng-pop h3{margin:0 0 4px;font-family:var(--serif);font-weight:700;font-size:23px}
+#eng-pop > p{margin:0 0 12px;font-size:13px;color:var(--mute);line-height:1.5}
+.opt{display:grid;grid-template-columns:18px 1fr;gap:2px 8px;padding:11px;border-radius:2px;border:1px solid rgba(20,20,20,.14);margin-top:7px;cursor:pointer;background:#fff}
+.opt input{margin:3px 0 0;accent-color:var(--accent)}
+.opt b{font-size:14px;font-weight:700}
+.opt span{grid-column:2;font-size:12.5px;color:var(--ink2);line-height:1.45}
+.opt code{font-size:11.5px;background:var(--paper);padding:1px 5px;border-radius:2px}
+.opt.dis{opacity:.5}
+.opt:has(input:checked){border-color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
+#eng-pop .act{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#eng-err{font-size:12.5px;color:var(--accent);margin-top:8px}
+.toast{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:80;max-width:calc(100% - 32px);padding:10px 16px;border-radius:2px;
+  background:var(--ink);color:#fff;font-size:14px;box-shadow:0 20px 40px -20px rgba(0,0,0,.5);animation:rm-toast .4s var(--ease) both}
+@keyframes rm-toast{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+
+@media (max-width: 860px){
+  .kb-date{display:none}
+  .kb-links{gap:14px;font-size:13px}
+  .kb-links .opt-hide{display:none}
+  .kb-hero .row{grid-template-columns:minmax(0,1fr);gap:18px}
+  .cmp .row2{flex-wrap:wrap}
+  .cmp .btn{padding:12px 16px;font-size:14px}
+  .facts{font-size:12.5px}
+  .cmp{justify-self:stretch}
+  .tagl{font-size:clamp(38px,11vw,56px)}
+  html,body{overflow-x:clip}
+  .kb-cur{display:none}
+  .seatlab{width:90px;margin-left:-45px}
+  .bub{max-width:calc(100vw - 32px)}
+  .bub.speak{left:16px!important;right:16px;top:auto!important;bottom:22px;transform:none!important;max-width:none;width:auto}
+  .bub.speak q .w{white-space:normal}
+  .bub.speak::after{display:none}
+  .bub.think{display:none}
+  .seatlab b{font-size:14px;display:none}
+  .seatlab.speaking b{display:block}
+  .seatlab u{display:none}
+  .seatlab.speaking u{display:inline-block;font-size:8px;padding:1px 5px;letter-spacing:.06em}
+  .rp-hd{flex-direction:column;align-items:flex-start;gap:8px}
+  .rp-meta{text-align:left}
+  #rp-doc h1{font-size:30px}
+  #kb-idea{min-height:72px}
+  .cmp .fine{display:none}
+  #rm-status{top:66px;left:16px;right:16px}
+  #rm-status .opt-hide{display:none}
+  #rp{width:100%;padding:44vh 12px 24px}
+  #rp-doc{padding:26px 20px 22px}
+  #rm-ch.top{top:60px}
+  #rm-ch.top .cq{font-size:22px}
+  #rm-press{left:16px;right:16px;width:auto;top:auto;bottom:18px}
+  .pr-cols{display:none}
+  #rm-sim{display:none}
+}
+@media (max-height: 780px) and (min-width: 861px){
+  #kb-idea{min-height:70px}
+  .cmp .fine{display:none}
+  .tagl{font-size:clamp(38px,4.6vw,70px)}
+  #rm-press{top:150px}
+  .pr-cols{display:none}
+}
+@media (prefers-reduced-motion: reduce){
+  .bub q .w{animation:none;opacity:1;transform:none;filter:none}
+}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+</head>
+<body>
+<div id="kb-load"><div><span>knowledgeboard</span><i></i></div></div>
+<canvas id="gl" aria-hidden="true"></canvas>
+<div class="kb-cur" aria-hidden="true"><b></b><i></i><span>rør</span></div>
+
+<nav class="kb-nav">
+  <div class="kb-l"><a class="kb-logo" href="https://www.knowledgeboard.dk/"><b>knowledge</b><span>board</span></a><span class="kb-date" id="kb-date">Pitch-rummet</span></div>
+  <div class="kb-links">
+    <a href="https://www.knowledgeboard.dk/kom-og-pitch-for-os" class="opt-hide">Pitch for det rigtige board ↗</a>
+    <button class="rm" id="rm-logbtn" type="button">Referat<em id="rm-count">0</em></button>
+  </div>
+</nav>
+
+<div id="rm-seats" aria-hidden="true"></div>
+<div id="rm-status"><span class="pulse"></span><span id="rm-st">Boardet tager plads</span><button type="button" id="rm-skip">Spring frem</button><button type="button" id="rm-stop" class="opt-hide">Stop</button></div>
+<div id="rm-bubs" aria-live="polite"></div>
+<div id="rm-sim">Simuleret panel &middot; anonyme roller</div>
+<div id="rm-card" role="dialog" aria-label="Rolle"></div>
+<aside id="rm-log" aria-label="Referat">
+  <header><div><h3>Referat</h3><p>Alt der er sagt i rummet, i rækkefølge</p></div><button class="x" id="rm-logx" type="button" aria-label="Luk">&times;</button></header>
+  <div id="rm-list"></div>
+</aside>
+<aside id="rm-chat" aria-label="Samtalen"><header><b>Samtalen</b><span id="chat-n"></span><button type="button" id="chat-min" aria-label="Skjul samtalen">&minus;</button></header><div id="chat-list"></div></aside>
+<button type="button" id="chat-pill">Samtalen <em id="chat-pn">0</em></button>
+<div id="rm-scrim" aria-hidden="true"></div>
+<div id="rm-ch" aria-live="polite"><div class="steps"><i></i><i></i><i></i></div><div class="ce"></div><h2 class="cq"></h2><p class="cs"></p><div class="bar"></div><div class="crow"><span class="ct"></span><span class="cp"></span><button type="button" id="ch-skip">Spring frem</button></div></div>
+<div id="rm-press" aria-hidden="true"></div>
+<section id="rp" aria-label="Rapport"><article id="rp-doc"></article>
+  <div class="rp-act"><button type="button" class="btn" id="rp-print">Print rapporten</button><button type="button" class="ghost" id="rp-copy">Kopiér</button><button type="button" class="ghost" id="rp-log">Referat</button><button type="button" class="ghost" id="rp-new">Ny pitch</button><a class="ghost" href="https://www.knowledgeboard.dk/kom-og-pitch-for-os">Pitch for det rigtige board ↗</a></div>
+</section>
+
+<div id="eng-pop" role="dialog" aria-label="Vælg motor">
+  <h3>Hvem tænker for boardet?</h3>
+  <p>Hver pitch bruger cirka 24 modelkald: et værn, et panel på 11 roller, 11 udfordringer, 11 greb og én rapport.</p>
+  <label class="opt" id="opt-live"><input type="radio" name="eng" value="live"><b>Live</b><span id="opt-live-t">Serveren har ingen nøgle.</span></label>
+  <label class="opt"><input type="radio" name="eng" value="demo"><b>Demo</b><span>En forudindspillet pitch. Ingen kald, godt til at vise rummet frem.</span></label>
+  <div id="eng-err" hidden></div>
+  <div class="act"><button type="button" class="ghost" id="eng-close">Luk</button><button type="button" class="btn" id="eng-save">Brug denne</button></div>
+</div>
+
+<main>
+  <section class="mi kb-hero" data-stage="0">
+    <h1 class="sr">Knowledgeboard. Tænk selv, men ikke alene. Pitch dit businesskoncept og få en skrevet validering.</h1>
+    <div class="row">
+      <div>
+        <div class="tagl"><span class="hl"><span>Tænk selv.</span></span><span class="hl d1"><span><em>men ikke alene.</em></span></span></div>
+        <div class="facts hl d2"><span>11 roller valgt til din idé<i></i>skreven rapport på cirka et minut<i></i><b>gratis</b> at pitche</span></div>
+      </div>
+      <form class="cmp fadein" id="kb-form" autocomplete="off">
+        <div id="kb-reject" role="alert"><span class="kick">Værnet</span><b>Pitchen blev ikke behandlet</b><p></p><button type="button">Ret pitchen</button></div>
+        <label for="kb-idea"><span class="kick">Pitch dit businesskoncept</span><em id="kb-count">0 tegn</em></label>
+        <textarea id="kb-idea" rows="3" maxlength="1400" placeholder="Fortæl om din virksomhed, dit marked og dine udfordringer."></textarea>
+        <input id="kb-want" type="text" maxlength="240" placeholder="Hvad vil du optimalt gå hjem med?">
+        <div class="row2">
+          <button type="button" class="eng" id="kb-eng" data-mode="probe"><i></i><span id="kb-eng-l">Finder boardet</span></button>
+          <button type="submit" class="btn" id="kb-go"><span id="kb-go-l">Pitch for boardet</span><span>&rarr;</span></button>
+        </div>
+        <p class="fine" id="kb-fine">Panelet er simuleret: 11 anonyme roller, valgt ud fra din pitch. Det rigtige board mødes med dig.</p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const mix = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const ease = (t) => { t = clamp(t); return t * t * t * (t * (t * 6 - 15) + 10); };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const FORCE = typeof window.__FORCE_S === 'number' ? window.__FORCE_S : null;
+const FORCE_ROOM = typeof window.__FORCE_ROOM === 'string' ? window.__FORCE_ROOM : null;
+
+// ---------- reveal ----------
+const io = new IntersectionObserver((es) => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }),
+  { threshold: 0.15, rootMargin: '0px 0px -6% 0px' });
+$$('.rv').forEach(el => io.observe(el));
+const markReady = () => document.body.classList.add('ready');
+
+// ---------- WebGL2 ----------
+const canvas = $('#gl');
+let gl2 = null;
+try { gl2 = canvas.getContext('webgl2', { antialias: false, alpha: false, powerPreference: 'high-performance' }); } catch (e) {}
+const HAS_GL = !!gl2;
+if (!HAS_GL) { document.body.classList.add('nogl'); canvas.style.display = 'none'; markReady(); }
+
+const renderer = HAS_GL ? new THREE.WebGLRenderer({ canvas, context: gl2, antialias: false }) : null;
+const MOBILE = matchMedia('(max-width: 860px)').matches || /Mobi|Android/i.test(navigator.userAgent);
+const NARROW = () => innerWidth / innerHeight < 0.85;
+let quality = MOBILE ? 0.62 : Math.min(devicePixelRatio, 1.25);
+if (renderer) {
+  renderer.setPixelRatio(quality);
+  renderer.setSize(innerWidth, innerHeight, false);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+}
+
+// ---------- the raymarched studio ----------
+// slots: 0 hoveddraabe · 1-11 boardets draaber (inden de bliver til figurer) · 12-14 argument-draaber · 15 flaaet draabe
+const NDROP = 16, NBUB = 24, NRIP = 8, NCH = 11;
+const U = {
+  uRes: { value: new THREE.Vector2() },
+  uCamPos: { value: new THREE.Vector3() }, uCamRot: { value: new THREE.Matrix3() }, uTanF: { value: 0.27 },
+  uTime: { value: 0 },
+  uDrop: { value: Array.from({ length: NDROP }, () => new THREE.Vector4()) },
+  uLiq: { value: Array.from({ length: NDROP }, () => new THREE.Vector3(0.9, 0.97, 1)) },
+  uK: { value: 0.5 }, uBound: { value: new THREE.Vector4(0, 0, 0, 2) },
+  uBub: { value: Array.from({ length: NBUB }, () => new THREE.Vector4()) },
+  uStretch: { value: new THREE.Vector3(1, 1, 1) },
+  uPtr: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uRip: { value: Array.from({ length: NRIP }, () => new THREE.Vector4(0, 0, 0, -1)) },
+  uRipA: { value: new Array(NRIP).fill(0) }, uDent: { value: new THREE.Vector4(0, 0, 0, 0) },
+  uTA: { value: new THREE.Vector4() }, uTM: { value: new THREE.Vector4() }, uTB: { value: new THREE.Vector4() }, uTon: { value: 0 },
+  uWob: { value: 0.02 }, uGhost: { value: 0 },
+  uPaper: { value: new THREE.Color() }, uInk: { value: new THREE.Color(1, 1, 1) }, uInkGlow: { value: 0 },
+  uKey: { value: 1 }, uDark: { value: 0 }, uIri: { value: 0.18 }, uCloud: { value: 0 },
+  uText: { value: null }, uTextRect: { value: new THREE.Vector4(-3, -0.5, 3, 2.5) }, uTextA: { value: 1 },
+  uChair: { value: Array.from({ length: NCH }, () => new THREE.Vector4(0, -3, 0, 0)) },
+  uChairA: { value: new Array(NCH).fill(0) },
+  uCB: { value: new THREE.Vector4(0, -0.8, -0.5, 4.0) }, uChairOn: { value: 0 },
+  uFig: { value: Array.from({ length: NCH }, () => new THREE.Vector4()) },
+  uFigC: { value: Array.from({ length: NCH }, () => new THREE.Vector3(1, 1, 1)) },
+  uFigG: { value: new Array(NCH).fill(0) },
+  uFigB: { value: Array.from({ length: NCH }, () => new THREE.Vector4(1, 1, 0, 1)) },
+  uFigQ: { value: Array.from({ length: NCH }, () => new THREE.Vector4(0, 1, 0, 0)) },
+};
+
+const FS = /* glsl */`
+precision highp float;
+uniform vec2 uRes; uniform vec3 uCamPos; uniform mat3 uCamRot; uniform float uTanF, uTime;
+uniform vec4 uDrop[${NDROP}]; uniform vec3 uLiq[${NDROP}]; uniform float uK; uniform vec4 uBound;
+uniform vec4 uBub[${NBUB}]; uniform vec3 uStretch; uniform vec4 uPtr; uniform vec4 uRip[${NRIP}]; uniform float uRipA[${NRIP}]; uniform vec4 uDent; uniform vec4 uTA, uTM, uTB; uniform float uTon;
+uniform float uWob, uKey, uDark, uIri, uCloud, uInkGlow, uTextA, uGhost;
+uniform vec3 uPaper, uInk; uniform sampler2D uText; uniform vec4 uTextRect;
+uniform vec4 uChair[${NCH}]; uniform float uChairA[${NCH}]; uniform vec4 uCB; uniform float uChairOn;
+uniform vec4 uFig[${NCH}]; uniform vec3 uFigC[${NCH}]; uniform float uFigG[${NCH}]; uniform vec4 uFigB[${NCH}], uFigQ[${NCH}];
+
+const float FLOOR = -1.35, WALLZ = -2.6, RC = 0.9, SEATY = -0.78, CS = 0.82;
+float gLod = 0.0;
+const vec3 LDIR = vec3(-0.2873, 0.8209, 0.4925);
+
+float smin(float a, float b, float k){ float h = max(k - abs(a - b), 0.0)/k; return min(a, b) - h*h*k*0.25; }
+float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2){
+  vec3 ba = b - a; float l2 = dot(ba, ba); float rr = r1 - r2; float a2 = l2 - rr*rr; float il2 = 1.0/l2;
+  vec3 pa = p - a; float y = dot(pa, ba); float z = y - l2;
+  vec3 xv = pa*l2 - ba*y; float x2 = dot(xv, xv); float y2 = y*y*l2; float z2 = z*z*l2;
+  float k = sign(rr)*rr*rr*x2;
+  if (sign(z)*a2*z2 > k) return sqrt(x2 + z2)*il2 - r2;
+  if (sign(y)*a2*y2 < k) return sqrt(x2 + y2)*il2 - r1;
+  return (sqrt(x2*a2*il2) + y*rr)*il2 - r1;
+}
+float sdCyl(vec3 p, float h, float r){ vec2 d = abs(vec2(length(p.xz), p.y)) - vec2(r, h); return min(max(d.x, d.y), 0.0) + length(max(d, 0.0)); }
+float sdRBox(vec3 p, vec3 b, float r){ vec3 q = abs(p) - b + r; return length(max(q, 0.0)) + min(max(q.x, max(q.y, q.z)), 0.0) - r; }
+float sdCap(vec3 p, vec3 a, vec3 b, float r){ vec3 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba)/dot(ba, ba), 0.0, 1.0); return length(pa - ba*h) - r; }
+
+float wob(vec3 p){
+  float t = uTime;
+  return sin(p.x*2.3 + t*1.10)*sin(p.y*2.1 - t*0.90)*sin(p.z*1.9 + t*0.70)*0.55
+       + sin(p.x*4.7 - t*1.70 + p.z*1.3)*sin(p.y*5.1 + t*1.30)*0.16
+       + sin(dot(p, vec3(7.1, 6.3, 5.7)) + t*2.4)*0.05;
+}
+float map(vec3 p){
+  float d = 1e3;
+  for (int i = 0; i < ${NDROP}; i++){
+    vec4 D = uDrop[i]; if (D.w <= 0.004) continue;
+    vec3 q = p - D.xyz; float di;
+    if (i == 0){ q /= uStretch; di = (length(q) - D.w)*min(min(uStretch.x, uStretch.y), uStretch.z); }
+    else di = length(q) - D.w;
+    d = smin(d, di, uK);
+  }
+  if (uTon > 0.5){
+    float tl = min(sdRoundCone(p, uTA.xyz, uTM.xyz, uTA.w, uTM.w), sdRoundCone(p, uTM.xyz, uTB.xyz, uTM.w, uTB.w));
+    d = smin(d, tl, 0.18);
+  }
+  d += wob(p)*uWob;
+  vec3 a = p - uPtr.xyz; d -= uPtr.w*exp(-dot(a, a)*7.0);
+  vec3 dq = p - uDent.xyz; d += uDent.w*exp(-dot(dq, dq)*16.0);
+  for (int i = 0; i < ${NRIP}; i++){
+    float age = uRip[i].w; if (age < 0.0) continue;
+    float r = length(p - uRip[i].xyz);
+    d += uRipA[i]*sin(r*24.0 - age*15.0)*exp(-age*1.9)*exp(-r*2.2)*smoothstep(0.0, 0.08, age);
+  }
+  return d;
+}
+vec3 calcN(vec3 p){
+  const vec2 e = vec2(1.0, -1.0)*0.0016;
+  return normalize(e.xyy*map(p + e.xyy) + e.yyx*map(p + e.yyx) + e.yxy*map(p + e.yxy) + e.xxx*map(p + e.xxx));
+}
+vec3 liqAt(vec3 p){
+  vec3 c = vec3(0.0); float ws = 0.0;
+  for (int i = 0; i < ${NDROP}; i++){
+    vec4 D = uDrop[i]; if (D.w <= 0.004) continue;
+    float w = exp(-max(length(p - D.xyz) - D.w, 0.0)*9.0)*D.w;
+    c += uLiq[i]*w; ws += w;
+  }
+  return ws > 0.0 ? c/ws : uLiq[0];
+}
+
+// ---- tulipan-stole: fod, stamme, saede og en buet skal; lokal +z vender mod draaben ----
+float chair1(vec3 p){
+  float base = sdCyl(p - vec3(0.0, FLOOR + 0.016, 0.0), 0.016, 0.27) - 0.012;
+  float stem = sdCap(p, vec3(0.0, FLOOR + 0.02, 0.0), vec3(0.0, SEATY - 0.04, 0.0), 0.036);
+  stem = smin(stem, base, 0.09);
+  float seat = sdCyl(p - vec3(0.0, SEATY, 0.02), 0.022, 0.32) - 0.028;
+  vec3 q = p - vec3(0.0, SEATY + 0.31, -0.25);
+  float c = cos(-0.2), s = sin(-0.2); q.yz = vec2(c*q.y + s*q.z, -s*q.y + c*q.z);
+  q.z -= q.x*q.x*0.9;
+  float back = sdRBox(q, vec3(0.27, 0.27, 0.012), 0.03);
+  float shell = smin(seat, back, 0.11);
+  return min(stem, shell);
+}
+// ---- siddende figur (lokal ramme: sidder paa saedet, +z mod draaben) ----
+// F = (vokset, laen frem, drej overkrop, gestik)   B = (hoejde, skulderbredde, mave, pose)   Q = (benene over kors, hovedstoerrelse, sammensunket, hovedhaeldning)
+// pose: 0 albuer paa knaeene · 1 haender paa laarene · 2 haand under hagen · 3 armene over kors · 4 lænet tilbage · 5 aabne arme
+float sdEll(vec3 p, vec3 r){ float k0 = length(p/r), k1 = length(p/(r*r)); return k0*(k0 - 1.0)/k1; }
+vec2 limb(vec3 q, vec3 a, vec3 e, vec3 h, float r1, float r2){
+  float d = min(sdCap(q, a, e, r1), sdCap(q, e, h, r2));
+  return vec2(d, length(q - h) - r2*1.15);
+}
+vec2 fig1(vec3 p, vec4 F, vec4 B, vec4 Q){
+  float g = F.x; if (g < 0.02) return vec2(1e3, 0.0);
+  vec3 o = vec3(0.0, SEATY + 0.03, 0.0);
+  vec3 q = (p - o)/g;
+  float H = B.x, SW = B.y, BL = B.z; int pose = int(B.w + 0.5);
+  float la = F.y*0.3 + Q.z*0.16 + (pose == 0 ? 0.34 : 0.0) + (pose == 4 ? -0.24 : 0.0) + (pose == 2 ? 0.12 : 0.0);
+  vec3 u = q - vec3(0.0, 0.08, 0.0);
+  float cl = cos(la), sl = sin(la);
+  u = vec3(u.x, cl*u.y - sl*u.z, sl*u.y + cl*u.z);
+  float ta = F.z, ct = cos(ta), st = sin(ta);
+  u = vec3(ct*u.x - st*u.z, u.y, st*u.x + ct*u.z);
+  u.y /= H; u += vec3(0.0, 0.08, 0.0);
+  // krop
+  float pelvis = sdRoundCone(u, vec3(0.0, 0.10, -0.07), vec3(0.0, 0.25, -0.07 + 0.02*BL), 0.118 + 0.02*BL, 0.10 + 0.04*BL);
+  float chest = sdRoundCone(u, vec3(0.0, 0.26, -0.075 + 0.015*BL), vec3(0.0, 0.40, -0.085), 0.105 + 0.025*BL, 0.098 + 0.02*SW);
+  float sh = sdCap(u, vec3(-0.115*SW, 0.425, -0.09), vec3(0.115*SW, 0.425, -0.09), 0.058);
+  float body = smin(smin(pelvis, chest, 0.07), sh, 0.06);
+  float lap = sdCap(u, vec3(-0.07, 0.43, -0.03), vec3(0.07, 0.43, -0.03), 0.018);          // revers/krave
+  body = smin(body, lap, 0.03);
+  // hoved: kranie, kaebe, naese, hals
+  vec3 hc = vec3(0.0, 0.615, -0.06);
+  vec3 hq = u - hc; float hs = Q.y;
+  float nod = Q.w; float cn = cos(nod), sn = sin(nod); hq = vec3(hq.x, cn*hq.y - sn*hq.z, sn*hq.y + cn*hq.z);
+  hq /= hs;
+  float skull = sdEll(hq - vec3(0.0, 0.012, -0.005), vec3(0.078, 0.095, 0.088));
+  float jaw = sdEll(hq - vec3(0.0, -0.045, 0.02), vec3(0.058, 0.05, 0.06));
+  float nose = sdCap(hq, vec3(0.0, 0.005, 0.075), vec3(0.0, -0.022, 0.093), 0.012);
+  float ears = sdEll(vec3(abs(hq.x), hq.y, hq.z) - vec3(0.078, 0.0, -0.005), vec3(0.012, 0.026, 0.018));
+  float head = smin(smin(skull, jaw, 0.04), smin(nose, ears, 0.01), 0.012)*hs;
+  float neck = sdCap(u, vec3(0.0, 0.44, -0.085), vec3(0.0, 0.54, -0.07), 0.037);
+  // arme efter pose
+  vec3 sL = vec3(-0.14*SW, 0.42, -0.09), sR = vec3(0.14*SW, 0.42, -0.09);
+  vec3 eL, hL, eR, hR;
+  if (pose == 0){ eL = vec3(-0.12, 0.16, 0.14); hL = vec3(-0.03, 0.15, 0.25); eR = vec3(0.12, 0.16, 0.14); hR = vec3(0.03, 0.155, 0.25); }
+  else if (pose == 2){ eL = vec3(-0.19, 0.24, 0.02); hL = vec3(0.04, 0.14, 0.15); eR = vec3(0.12, 0.2, 0.14); hR = vec3(0.025, 0.5, 0.03); }
+  else if (pose == 3){ eL = vec3(-0.17, 0.27, 0.03); hL = vec3(0.11, 0.33, 0.03); eR = vec3(0.17, 0.28, 0.035); hR = vec3(-0.11, 0.34, 0.035); }
+  else if (pose == 4){ eL = vec3(-0.2, 0.25, -0.13); hL = vec3(-0.21, 0.08, -0.03); eR = vec3(0.2, 0.25, -0.13); hR = vec3(0.21, 0.08, -0.03); }
+  else if (pose == 5){ eL = vec3(-0.23, 0.27, 0.03); hL = vec3(-0.25, 0.36, 0.15); eR = vec3(0.23, 0.27, 0.03); hR = vec3(0.25, 0.36, 0.15); }
+  else { eL = vec3(-0.19, 0.24, 0.0); hL = vec3(-0.12, 0.11, 0.17); eR = vec3(0.19, 0.24, 0.0); hR = vec3(0.12, 0.11, 0.17); }
+  // gestik naar man taler: hoejre haand loeftes frem, venstre let aaben
+  eR = mix(eR, vec3(0.21, 0.27, 0.09), F.w); hR = mix(hR, vec3(0.19, 0.43, 0.24), F.w);
+  hL = mix(hL, hL + vec3(-0.03, 0.05, 0.04), F.w*0.6);
+  vec2 aL = limb(u, sL, eL, hL, 0.042, 0.034), aR = limb(u, sR, eR, hR, 0.042, 0.034);
+  float arms = min(aL.x, aR.x);
+  float hands = min(aL.y, aR.y);
+  // ben (foelger ikke overkroppen)
+  float FL = FLOOR - SEATY - 0.03;
+  vec3 kL = vec3(-0.09, 0.075, 0.24), kR = vec3(0.09, 0.075, 0.24);
+  vec3 aLk = vec3(-0.1, FL + 0.07, 0.3), aRk = vec3(0.1, FL + 0.07, 0.3);
+  float legs;
+  float feet;
+  if (Q.x > 0.5){            // hoejre ben over venstre
+    vec3 kR2 = vec3(-0.01, 0.16, 0.23), aR2 = vec3(-0.07, -0.13, 0.36);
+    legs = min(min(sdCap(q, vec3(-0.085, 0.07, -0.05), kL, 0.07), sdCap(q, kL, aLk, 0.052)),
+               min(sdCap(q, vec3(0.085, 0.08, -0.05), kR2, 0.07), sdCap(q, kR2, aR2, 0.05)));
+    feet = min(sdCap(q, aLk + vec3(0.0, -0.025, 0.0), aLk + vec3(0.0, -0.035, 0.1), 0.035), sdCap(q, aR2, aR2 + vec3(-0.01, -0.04, 0.09), 0.034));
+  } else {
+    vec3 lq = vec3(abs(q.x), q.y, q.z);
+    float spread = pose == 4 ? 0.05 : 0.0;
+    vec3 k = vec3(0.09 + spread, 0.075, 0.24), an = vec3(0.1 + spread*1.5, FL + 0.07, 0.3 + (pose == 4 ? 0.08 : 0.0));
+    legs = min(sdCap(lq, vec3(0.085, 0.07, -0.05), k, 0.07), sdCap(lq, k, an, 0.052));
+    feet = sdCap(lq, an + vec3(0.0, -0.025, 0.0), an + vec3(0.0, -0.035, 0.1), 0.035);
+  }
+  float cloth = smin(smin(body, arms, 0.045), smin(legs, feet, 0.02), 0.07);
+  float skin = min(min(head, neck), hands);
+  float d = smin(cloth, skin, 0.025);
+  return vec2(d*g, skin < cloth ? 1.0 : 0.0);
+}
+// afstand + id (0 = stol, 1 = toej, 2 = hud) for én plads
+vec2 seatOne(vec3 p, int i){
+  vec4 C = uChair[i];
+  vec3 q = p - C.xyz;
+  float cs = cos(C.w), sn = sin(C.w);
+  q = vec3(cs*q.x - sn*q.z, q.y, sn*q.x + cs*q.z);
+  q = vec3(q.x, (q.y - FLOOR)/CS + FLOOR, q.z); q.xz /= CS;
+  float dc = chair1(q)*CS*0.8;
+  vec2 f = fig1(q, uFig[i], uFigB[i], uFigQ[i]);
+  float df = f.x*CS*0.8;
+  return df < dc ? vec2(df, 1.0 + f.y) : vec2(dc, 0.0);
+}
+float mapC(vec3 p){
+  float d = 1e3;
+  for (int i = 0; i < ${NCH}; i++){
+    if (uChairA[i] < 0.01) continue;
+    vec3 q = p - uChair[i].xyz;
+    float bb = length(q - vec3(0.0, -0.8, 0.0)) - 0.78;
+    if (bb > d) continue;
+    if (bb > 0.25){ d = min(d, bb); continue; }
+    d = min(d, seatOne(p, i).x);
+  }
+  return d;
+}
+vec3 seatHit(vec3 p){          // (afstand, id, plads)
+  float d = 1e3, id = 0.0, k = 0.0;
+  for (int i = 0; i < ${NCH}; i++){
+    if (uChairA[i] < 0.01) continue;
+    vec2 r = seatOne(p, i); if (r.x < d){ d = r.x; id = r.y; k = float(i); }
+  }
+  return vec3(d, id, k);
+}
+vec3 calcNC(vec3 p){
+  const vec2 e = vec2(1.0, -1.0)*0.0012;
+  return normalize(e.xyy*mapC(p + e.xyy) + e.yyx*mapC(p + e.yyx) + e.yxy*mapC(p + e.yxy) + e.xxx*mapC(p + e.xxx));
+}
+
+float caustic(vec2 p, float t){
+  p = mod(p, 6.2831853) - 250.0; vec2 i = p; float c = 1.0; float inten = 0.005;
+  for (int n = 0; n < 4; n++){ float tt = t*(1.0 - (3.5/float(n + 1)));
+    i = p + vec2(cos(tt - i.x) + sin(tt + i.y), sin(tt - i.y) + cos(tt + i.x));
+    c += 1.0/length(vec2(p.x/(sin(i.x + tt)/inten), p.y/(cos(i.y + tt)/inten))); }
+  c /= 4.0; c = 1.17 - pow(c, 1.4); return clamp(pow(abs(c), 8.0), 0.0, 1.5);
+}
+
+float cycHit(vec3 ro, vec3 rd, out vec3 N){
+  float tb = 1e5; N = vec3(0.0, 1.0, 0.0);
+  float yc = FLOOR + RC, zc = WALLZ + RC;
+  if (rd.y < 0.0){ float t = (FLOOR - ro.y)/rd.y; vec3 P = ro + rd*t; if (t > 0.0 && P.z >= zc){ tb = t; N = vec3(0.0, 1.0, 0.0); } }
+  if (rd.z < 0.0){ float t = (WALLZ - ro.z)/rd.z; vec3 P = ro + rd*t; if (t > 0.0 && t < tb && P.y >= yc){ tb = t; N = vec3(0.0, 0.0, 1.0); } }
+  vec2 o = ro.yz - vec2(yc, zc), d = rd.yz; float a = dot(d, d);
+  if (a > 1e-6){
+    float b = dot(o, d), c = dot(o, o) - RC*RC, h = b*b - a*c;
+    if (h > 0.0){ float t = (-b + sqrt(h))/a; vec3 P = ro + rd*t;
+      if (t > 0.0 && t < tb && P.y < yc && P.z < zc){ tb = t; N = normalize(vec3(0.0, yc - P.y, zc - P.z)); } }
+  }
+  return tb;
+}
+vec3 cycShade(vec3 P, vec3 N){
+  float lam = max(dot(N, LDIR), 0.0);
+  vec3 sp = P - vec3(0.0, -0.9, -1.4);
+  float spot = exp(-dot(sp, sp)*0.05);
+  float fall = exp(-max(P.y - 0.4, 0.0)*0.32) * exp(-max(P.z - 3.0, 0.0)*0.12) * exp(-max(abs(P.x) - 3.5, 0.0)*0.22);
+  float irr = (0.16 + 0.55*lam + 0.85*spot)*fall; irr = irr/(1.0 + max(irr - 0.9, 0.0)*0.6);
+  float sh = 1.0, ao = 1.0, foc = 0.0, cm = 0.0; vec3 tint = vec3(1.0); vec2 warp = vec2(0.0);
+  vec3 Ub = normalize(cross(LDIR, vec3(1.0, 0.0, 0.0))), Vb = cross(LDIR, Ub);
+  for (int i = 0; i < ${NDROP}; i++){
+    vec4 D = uDrop[i]; if (D.w <= 0.004) continue;
+    vec3 d = D.xyz - P; float dl = length(d);
+    ao *= 1.0 - clamp(dot(N, d)/dl*(D.w*D.w)/(dl*dl), 0.0, 1.0)*0.8;
+    float tt = dot(d, LDIR); if (tt <= 0.0) continue;
+    vec3 perp = d - LDIR*tt; float x = length(perp)/D.w;
+    float pen = 0.2 + 0.16*tt/D.w;
+    float s = smoothstep(1.0 + pen, 1.0 - pen, x);
+    float ring = exp(-pow((x - 0.93)/(0.08 + pen*0.5), 2.0));
+    sh *= 1.0 - s*0.26 - ring*0.34;
+    tint = mix(tint, uLiq[i]*uLiq[i], s*0.85);
+    foc += s*exp(-x*x*6.0)/(1.0 + tt*0.3);
+    warp += vec2(dot(perp, Ub), dot(perp, Vb))*s*0.8;
+    cm = max(cm, s);
+  }
+  if (uChairOn > 0.5){
+    for (int i = 0; i < ${NCH}; i++){
+      if (uChairA[i] < 0.01) continue;
+      vec4 C = uChair[i]; float vis = clamp(1.0 + C.y/0.5, 0.0, 1.0);
+      vec2 bxz = P.xz - C.xz; float bd = dot(bxz, bxz);
+      ao *= 1.0 - 0.6*exp(-bd*22.0)*step(P.y, FLOOR + 0.05)*vis;
+      vec3 cc = C.xyz + vec3(0.0, FLOOR + (SEATY + 0.2 - FLOOR)*CS, 0.0);
+      vec3 d = cc - P; float tt = dot(d, LDIR); if (tt <= 0.0) continue;
+      float x = length(d - LDIR*tt)/(0.36 + 0.06*uFig[i].x), pen = 0.3 + 0.22*tt;
+      sh *= 1.0 - smoothstep(1.0 + pen, 1.0 - pen, x)*0.34*vis;
+    }
+  }
+  vec3 alb = uPaper; float ink = 0.0;
+  {
+    vec2 tuv = (P.xy - uTextRect.xy)/(uTextRect.zw - uTextRect.xy);
+    float foot = length(P - uCamPos)*2.0*uTanF/uRes.y;
+    float lod = log2(max(foot*2048.0/(uTextRect.z - uTextRect.x), 1.0)) + gLod;
+    vec4 tx = textureLod(uText, clamp(tuv, 0.0, 1.0), lod);
+    float inside = step(0.0, tuv.x)*step(0.0, tuv.y)*step(tuv.x, 1.0)*step(tuv.y, 1.0)*step(0.5, N.z)*uTextA;
+    ink = tx.a*inside; alb = alb*(1.0 - ink) + tx.rgb*uInk*inside;
+  }
+  vec3 col = alb*irr*uKey*sh*ao*tint + uInk*ink*uInkGlow*ao;
+  if (cm > 0.001){
+    vec2 cp = vec2(dot(P, Ub), dot(P, Vb))*1.8 + warp*1.7;
+    float ca = caustic(cp, uTime*0.5), cb = caustic(cp*1.025 + 0.05, uTime*0.5);
+    vec3 cst = vec3(ca, (ca + cb)*0.5, cb);
+    col += (alb*0.65 + 0.35)*tint*(cst*cm*0.5 + foc*1.35)*max(lam, 0.25)*max(uKey, 0.35);
+  }
+  return col;
+}
+float rectM(vec2 q, vec4 r, float soft){ return smoothstep(0.0, soft, min(min(q.x - r.x, r.z - q.x), min(q.y - r.y, r.w - q.y))); }
+vec3 softbox(vec3 ro, vec3 rd, float tMax){
+  vec3 c = vec3(0.0);
+  float kTop = mix(16.0, 1.0, uDark), kSide = mix(8.0, 1.2, uDark), kRim = mix(6.5, 9.0, uDark);
+  if (rd.y > 0.0){ float t = (4.6 - ro.y)/rd.y; if (t < tMax){ vec2 q = (ro + rd*t).xz; c += vec3(1.0, 0.985, 0.96)*kTop*rectM(q, vec4(-2.8, -1.2, 1.3, 2.4), 0.25); } }
+  if (rd.x < 0.0){ float t = (-4.4 - ro.x)/rd.x; if (t < tMax){ vec2 q = (ro + rd*t).zy; c += vec3(1.0)*kSide*rectM(q, vec4(-0.6, -0.8, 2.6, 3.4), 0.12); } }
+  if (rd.x > 0.0){ float t = (4.4 - ro.x)/rd.x; if (t < tMax){ vec2 q = (ro + rd*t).zy; c += vec3(0.86, 0.93, 1.0)*kRim*rectM(q, vec4(-2.3, -0.9, -0.5, 3.2), 0.1); } }
+  if (rd.z > 0.0){ float t = (7.5 - ro.z)/rd.z; if (t < tMax){ vec2 q = (ro + rd*t).xy; c += vec3(1.0)*0.9*(1.0 - uDark)*rectM(q, vec4(-4.0, -1.0, 4.0, 3.5), 0.8); } }
+  return c;
+}
+vec3 envFull(vec3 ro, vec3 rd, float sb){
+  vec3 N; float t = cycHit(ro, rd, N);
+  vec3 c = t < 1e4 ? cycShade(ro + rd*t, N) : uPaper*0.05*uKey;
+  return c + softbox(ro, rd, t)*sb;
+}
+vec3 shadeDrop(vec3 ro, vec3 rd, vec3 p){
+  vec3 n = calcN(p);
+  vec3 liq = liqAt(p);
+  float cosi = clamp(-dot(rd, n), 0.0, 1.0);
+  float F = 0.02 + 0.98*pow(1.0 - cosi, 5.0);
+  gLod = 1.0 + 5.0*(1.0 - cosi)*(1.0 - cosi);
+  vec3 refl = envFull(p + n*0.004, reflect(rd, n), 1.0);
+  float th = 0.5 + 0.5*sin(dot(p, vec3(3.1, 2.3, 1.7)) + uTime*0.6);
+  vec3 film = 0.55 + 0.45*cos(6.2831*(vec3(0.0, 0.33, 0.67) + th*1.4 + cosi*1.8));
+  refl *= mix(vec3(1.0), film*1.35, uIri*(1.0 - cosi*0.6));
+  vec3 rdi = refract(rd, n, 1.0/1.333);
+  float ti = 0.012;
+  for (int j = 0; j < 40; j++){ float d = -map(p + rdi*ti); if (d < 0.0015) break; ti += max(d*0.9, 0.006); if (ti > 5.0) break; }
+  vec3 p2 = p + rdi*ti, n2 = calcN(p2), q = p2 + n2*0.004;
+  vec3 e0 = refract(rdi, -n2, 1.326); if (dot(e0, e0) < 0.01) e0 = reflect(rdi, -n2);
+  vec3 e1 = refract(rdi, -n2, 1.333); if (dot(e1, e1) < 0.01) e1 = reflect(rdi, -n2);
+  vec3 e2 = refract(rdi, -n2, 1.340); if (dot(e2, e2) < 0.01) e2 = reflect(rdi, -n2);
+  gLod = 1.2 + 7.5*pow(1.0 - cosi, 3.0);
+  vec3 trans = vec3(envFull(q, e0, 1.0).r, envFull(q, e1, 1.0).g, envFull(q, e2, 1.0).b);
+  float tb = ti; vec3 bn = vec3(0.0); float bh = 0.0;
+  for (int k = 0; k < ${NBUB}; k++){
+    vec4 B = uBub[k]; if (B.w <= 0.0) continue;
+    vec3 oc = p - B.xyz; float b = dot(oc, rdi), c = dot(oc, oc) - B.w*B.w, h = b*b - c;
+    if (h > 0.0){ float tt = -b - sqrt(h); if (tt > 0.0 && tt < tb){ tb = tt; bn = normalize(oc + rdi*tt); bh = 1.0; } }
+  }
+  if (bh > 0.5){
+    float rim = pow(1.0 - abs(dot(rdi, bn)), 1.3);
+    vec3 bc = softbox(p + rdi*tb, reflect(rdi, bn), 1e5)*0.55 + uPaper*0.3*uKey + 0.06;
+    trans = mix(trans, bc, clamp(rim*1.15, 0.0, 0.92));
+  }
+  gLod = 0.0;
+  vec3 T = pow(max(liq, vec3(1e-3)), vec3(ti*1.45));
+  float hot = 0.0;
+  for (int i = 0; i < ${NDROP}; i++){
+    vec4 D = uDrop[i]; if (D.w <= 0.05) continue;
+    vec3 fpnt = D.xyz - LDIR*D.w*0.78; vec3 dd = p2 - fpnt;
+    hot += exp(-dot(dd, dd)/(D.w*D.w*0.12));
+  }
+  trans += liq*hot*uKey*2.6;
+  vec3 col = trans*T + liq*(1.0 - T.g)*uCloud*(0.35 + 0.6*uKey)*vec3(1.0, 0.82, 0.55);
+  col = col*(1.0 - F) + refl*F;
+  // hero i hvile: draaben er naesten ren glas, saa vaegteksten bag den kan laeses; kanten og hoejlysene bliver
+  if (uGhost > 0.001){
+    vec3 Nb; float tb = cycHit(ro, rd, Nb);
+    vec3 bg = tb < 1e4 ? cycShade(ro + rd*tb, Nb) : uPaper*0.05*uKey;
+    float rim = pow(1.0 - cosi, 2.2);
+    col = mix(col, bg + refl*F*0.75, uGhost*(1.0 - rim*0.82));
+  }
+  col += uDark*pow(1.0 - cosi, 3.0)*vec3(0.62, 0.78, 1.0)*1.1;
+  return col;
+}
+vec3 shadeChair(vec3 ro, vec3 rd, vec3 p){
+  vec3 n = calcNC(p);
+  float cosi = clamp(-dot(rd, n), 0.0, 1.0);
+  float F = 0.045 + 0.955*pow(1.0 - cosi, 5.0);
+  float lam = max(dot(n, LDIR), 0.0);
+  float sky = 0.5 + 0.5*n.y;
+  float sh = 1.0;
+  for (int i = 0; i < ${NDROP}; i++){ vec4 D = uDrop[i]; if (D.w <= 0.004) continue;
+    vec3 d = D.xyz - p; float tt = dot(d, LDIR); if (tt <= 0.0) continue;
+    float x = length(d - LDIR*tt)/D.w; sh *= 1.0 - smoothstep(1.25, 0.7, x)*0.4; }
+  float occ = 0.5 + 0.5*smoothstep(FLOOR, FLOOR + 0.55, p.y);
+  vec3 alb = vec3(0.93, 0.935, 0.95);
+  vec3 bounce = uPaper*(0.45 + 0.55*(1.0 - max(n.y, 0.0)))*0.55;
+  vec3 diff = alb*(lam*0.95*sh + 0.2*sky + bounce)*occ*uKey;
+  vec3 refl = envFull(p + n*0.004, reflect(rd, n), 1.0);
+  vec3 col = diff*(1.0 - F) + refl*F;
+  col += uDark*pow(1.0 - cosi, 3.0)*vec3(0.62, 0.78, 1.0)*0.55;
+  return col;
+}
+vec3 shadeFig(vec3 ro, vec3 rd, vec3 p, int k, float skin){
+  vec3 n = calcNC(p);
+  vec3 tint = uFigC[k]; float glow = uFigG[k];
+  float cosi = clamp(-dot(rd, n), 0.0, 1.0);
+  float lam = max(dot(n, LDIR), 0.0), wrap = max(dot(n, LDIR)*0.5 + 0.5, 0.0);
+  // hud: varm, halvmat med lidt gennemlysning; toej: farvet, blødt satin
+  vec3 skinC = mix(vec3(0.93, 0.78, 0.68), tint, 0.22);
+  vec3 clothC = mix(tint*0.82, vec3(0.2, 0.22, 0.3), 0.18);
+  vec3 alb = skin > 0.5 ? skinC : clothC;
+  float F = (skin > 0.5 ? 0.03 : 0.04) + 0.96*pow(1.0 - cosi, 5.0);
+  float sh = 1.0;
+  for (int i = 0; i < ${NDROP}; i++){ vec4 D = uDrop[i]; if (D.w <= 0.004) continue;
+    vec3 d = D.xyz - p; float tt = dot(d, LDIR); if (tt <= 0.0) continue;
+    float x = length(d - LDIR*tt)/D.w; sh *= 1.0 - smoothstep(1.25, 0.7, x)*0.35; }
+  float occ = 0.55 + 0.45*smoothstep(FLOOR, FLOOR + 0.5, p.y);
+  float sky = 0.5 + 0.5*n.y;
+  vec3 bounce = uPaper*(0.4 + 0.6*(1.0 - max(n.y, 0.0)))*0.5;
+  vec3 diff = alb*((skin > 0.5 ? wrap*0.9 : lam*0.85)*sh + 0.24*sky + bounce)*occ*uKey;
+  vec3 sss = skin > 0.5 ? vec3(0.9, 0.35, 0.25)*pow(1.0 - cosi, 2.0)*0.12*uKey : vec3(0.0);
+  vec3 refl = envFull(p + n*0.004, reflect(rd, n), 1.0);
+  vec3 col = diff + sss;
+  col = col*(1.0 - F*0.8) + refl*F*(skin > 0.5 ? 0.35 : 0.5);
+  col += tint*pow(1.0 - cosi, 2.4)*(0.08 + 0.55*glow);           // kantlys i personaens farve, staerkere naar den taler
+  col += uDark*pow(1.0 - cosi, 3.0)*vec3(0.62, 0.78, 1.0)*0.5;
+  return col;
+}
+void main(){
+  vec2 uv = (gl_FragCoord.xy*2.0 - uRes)/uRes.y;
+  vec3 ro = uCamPos, rd = normalize(uCamRot*vec3(uv*uTanF, -1.0));
+  vec3 Nc; float tc = cycHit(ro, rd, Nc); float tcl = tc < 1e4 ? tc : 60.0;
+  vec3 col; float depth = 60.0;
+  vec3 oc = ro - uBound.xyz; float b = dot(oc, rd), c = dot(oc, oc) - uBound.w*uBound.w, h = b*b - c;
+  bool hit = false; float t = 0.0, md = 1e9, tm = 0.0;
+  if (h > 0.0){
+    float sq = sqrt(h), t1 = min(-b + sq, tcl); t = max(-b - sq, 0.0);
+    for (int i = 0; i < 120; i++){ float d = map(ro + rd*t); float r = d/max(t, 1e-3); if (r < md){ md = r; tm = t; }
+      if (d < 0.0006*t + 0.0003){ hit = true; break; } t += max(d*0.8, 0.0004*t); if (t > t1) break; }
+  }
+  float tch = 1e5;
+  if (uChairOn > 0.5){
+    vec3 o2 = ro - uCB.xyz; float b2 = dot(o2, rd), c2 = dot(o2, o2) - uCB.w*uCB.w, h2 = b2*b2 - c2;
+    if (h2 > 0.0){
+      float sq2 = sqrt(h2); float t2 = max(-b2 - sq2, 0.0), t2e = min(-b2 + sq2, tcl);
+      for (int i = 0; i < 96; i++){ float d = mapC(ro + rd*t2); if (d < 0.0007*t2){ tch = t2; break; } t2 += d; if (t2 > t2e) break; }
+    }
+  }
+  if (hit && t < tch){ col = shadeDrop(ro, rd, ro + rd*t); depth = t; }
+  else if (tch < 1e4){ vec3 ph = ro + rd*tch; vec3 sh = seatHit(ph); if (sh.y > 0.5) col = shadeFig(ro, rd, ph, int(sh.z + 0.5), step(1.5, sh.y)); else col = shadeChair(ro, rd, ph); depth = tch; }
+  else {
+    if (tc < 1e4){ col = cycShade(ro + rd*tc, Nc); depth = tc; } else col = uPaper*0.05*uKey;
+    float pix = 2.2*uTanF/uRes.y;
+    if (md < pix){ float cov = 1.0 - md/pix; col = mix(col, shadeDrop(ro, rd, ro + rd*tm), cov*cov*(3.0 - 2.0*cov)); depth = mix(depth, tm, step(0.5, cov)); }
+  }
+  gl_FragColor = vec4(max(col, 0.0), depth);
+}`;
+
+const persp = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.05, 80);
+const FOCUS = { value: 4.5 };
+let composer = null, dof = null, lens = null, bloom = null;
+const DUSTU = { uTime: U.uTime, uFocus: FOCUS, uH: { value: innerHeight }, uDark: U.uDark, uDim: { value: 1 } };
+if (renderer) {
+  const quadScene = new THREE.Scene();
+  const orthoCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const studioMat = new THREE.ShaderMaterial({ uniforms: U, fragmentShader: FS, blending: THREE.NoBlending, depthTest: false, depthWrite: false,
+    vertexShader: `void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }` });
+  quadScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), studioMat));
+  const dustScene = new THREE.Scene();
+  {
+    const N = MOBILE ? 140 : 260, pp = new Float32Array(N * 3), ps = new Float32Array(N), pr = new Float32Array(N);
+    let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < N; i++) { pp[i*3] = (r() - .5) * 10; pp[i*3+1] = r() * 4.2 - 1.3; pp[i*3+2] = r() * 7 - 1.8; ps[i] = 0.5 + r() * r() * 2.4; pr[i] = r(); }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pp, 3)); g.setAttribute('size', new THREE.BufferAttribute(ps, 1)); g.setAttribute('rnd', new THREE.BufferAttribute(pr, 1));
+    const m = new THREE.ShaderMaterial({ uniforms: DUSTU, transparent: true, depthTest: false, depthWrite: false,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+      blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+      vertexShader: `attribute float size, rnd; uniform float uTime, uFocus, uH; varying float vA, vCoc;
+        void main(){ vec3 p = position; float t = uTime*(0.4 + rnd*0.5);
+          p += vec3(sin(t*0.37 + rnd*20.0), sin(t*0.23 + rnd*9.0)*0.6, cos(t*0.29 + rnd*14.0))*0.35;
+          vec4 mv = modelViewMatrix*vec4(p, 1.0); float d = max(-mv.z, 0.05);
+          float coc = clamp(abs(d - uFocus)*1.2, 0.0, 16.0);
+          gl_PointSize = size*0.016*uH/d + coc*uH*0.0042;
+          vCoc = coc; vA = (0.35 + 0.65*rnd)/(1.0 + coc*coc*0.28)*smoothstep(0.2, 0.9, d);
+          gl_Position = projectionMatrix*mv; }`,
+      fragmentShader: `uniform float uDark, uDim; varying float vA, vCoc;
+        void main(){ vec2 c = gl_PointCoord*2.0 - 1.0; float r = length(c); if (r > 1.0) discard;
+          float sharp = smoothstep(1.0, 0.15, r), disk = smoothstep(1.0, 0.84, r)*(0.72 + 0.28*smoothstep(0.45, 0.95, r));
+          float a = mix(sharp, disk, clamp(vCoc*0.35, 0.0, 1.0))*vA;
+          gl_FragColor = vec4(vec3(0.9, 0.95, 1.0)*a*mix(0.28, 0.75, uDark)*uDim, 0.0); }` });
+    const pts = new THREE.Points(g, m); pts.frustumCulled = false; dustScene.add(pts);
+  }
+  const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+  composer = new EffectComposer(renderer, rt);
+  composer.addPass(new RenderPass(quadScene, orthoCam));
+  const dustPass = new RenderPass(dustScene, persp); dustPass.clear = false; composer.addPass(dustPass);
+  dof = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, uFocus: FOCUS, uAp: { value: 8 }, uMaxR: { value: 13 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uFocus, uAp, uMaxR; uniform vec2 uRes; varying vec2 vUv;
+      float coc(vec2 uv){ float d = texture2D(tDiffuse, uv).a; if (d <= 0.0) d = 60.0; return clamp(abs(d - uFocus)/d*uAp, 0.0, uMaxR); }
+      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
+      void main(){
+        float c0 = coc(vUv);
+        vec3 acc = min(texture2D(tDiffuse, vUv).rgb, vec3(6.0)); float w = 1.0;
+        if (c0 > 0.35 || uAp > 0.0){
+          const float GA = 2.39996323; float rot = h(vUv*uRes)*6.2831;
+          for (int i = 1; i < 40; i++){
+            float fi = float(i); float r = sqrt((fi + h(vUv*uRes + fi)*0.5)/40.0)*uMaxR;
+            vec2 o = vec2(cos(fi*GA + rot), sin(fi*GA + rot))*r/uRes;
+            float cs = coc(vUv + o);
+            float wt = smoothstep(r - 1.0, r + 1.0, min(cs, c0 + 2.0));
+            acc += min(texture2D(tDiffuse, vUv + o).rgb, vec3(6.0))*wt; w += wt;
+          }
+        }
+        gl_FragColor = vec4(acc/w, 1.0);
+      }` });
+  dof.uniforms.uFocus = FOCUS;
+  composer.addPass(dof);
+  bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.16, 0.5, 1.25);
+  composer.addPass(bloom);
+  lens = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, uTime: U.uTime, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) }, uVig: { value: 0.35 } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uTime, uVig; uniform vec2 uRes; varying vec2 vUv;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
+      void main(){
+        vec2 d = vUv - 0.5; float r2 = dot(d, d);
+        vec2 ca = d*r2*0.006;
+        vec3 col = vec3(texture2D(tDiffuse, vUv + ca).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - ca).b);
+        col *= mix(1.0, 1.0 - uVig, smoothstep(0.1, 0.7, r2*1.9));
+        float g = h(vUv*uRes + fract(uTime*7.0)*97.0) - 0.5;
+        col += g*0.014*(0.35 + 0.65*(1.0 - clamp(dot(col, vec3(0.33)), 0.0, 1.0)));
+        gl_FragColor = vec4(col, 1.0);
+      }` });
+  lens.uniforms.uTime = U.uTime;
+  composer.addPass(lens);
+  composer.addPass(new OutputPass());
+}
+
+function resize() {
+  if (renderer) {
+    renderer.setPixelRatio(quality);
+    renderer.setSize(innerWidth, innerHeight, false);
+    composer.setPixelRatio(quality);
+    composer.setSize(innerWidth, innerHeight);
+    U.uRes.value.set(innerWidth * quality, innerHeight * quality);
+    dof.uniforms.uRes.value.set(innerWidth, innerHeight);
+    lens.uniforms.uRes.value.set(innerWidth, innerHeight);
+    DUSTU.uH.value = innerHeight * quality;
+  }
+  persp.aspect = innerWidth / innerHeight; persp.updateProjectionMatrix();
+  layoutKeys();
+}
+
+// ---------- text printed on the studio wall ----------
+const tcv = document.createElement('canvas'); tcv.width = 2048; tcv.height = 1024;
+const tctx = tcv.getContext('2d');
+const textTex = new THREE.CanvasTexture(tcv); textTex.anisotropy = 8; textTex.generateMipmaps = true;
+textTex.premultiplyAlpha = true; textTex.colorSpace = THREE.SRGBColorSpace;
+textTex.minFilter = THREE.LinearMipmapLinearFilter;
+U.uText.value = textTex;
+let wallWords = '';
+function drawWall(lines) {
+  const key = lines.join('|'); if (key === wallWords) return; wallWords = key;
+  const W = tcv.width, H = tcv.height;
+  tctx.clearRect(0, 0, W, H); tctx.fillStyle = '#fff'; tctx.textAlign = 'center'; tctx.textBaseline = 'alphabetic';
+  try { tctx.letterSpacing = '-0.035em'; } catch (e) {}
+  let size = 600; tctx.font = `600 ${size}px "Source Serif 4", Georgia, serif`;
+  const wmax = Math.max(...lines.map(l => tctx.measureText(l).width));
+  size = Math.min(size * (W * 0.96) / wmax, H * (lines.length > 1 ? 0.5 : 0.62)); tctx.font = `600 ${size}px "Source Serif 4", Georgia, serif`;
+  const lh = size * 0.92, total = lh * (lines.length - 1);
+  lines.forEach((l, i) => tctx.fillText(l, W / 2, H / 2 - total / 2 + i * lh + size * 0.32));
+  textTex.needsUpdate = true;
+}
+
+// ---------- kamera-tilstande (lyst avispapir-studie) ----------
+const col = (h) => new THREE.Color(h);
+const HERO_CAM = { cam: [0, 0.18, 5.7], tgt: [0, 0.12, 0], fov: 30, ap: 5, paper: col('#e3dccd'), key: 1.0, dark: 0, iri: 0.16 };
+const ROOM_CAM = { cam: [0, 3.4, 9.4], tgt: [0, -0.42, -0.45], fov: 28.5, ap: 6, paper: col('#e0d9c9'), key: 1.0, dark: 0, iri: 0.14 };
+const VERD_CAM = { cam: [0.9, 0.2, 6.6], tgt: [1.45, -0.25, 0.3], fov: 30, ap: 7, paper: col('#d6cebd'), key: 0.92, dark: 0, iri: 0.2 };
+const MOBROOM = MOBILE || NARROW();
+if (MOBROOM) {
+  HERO_CAM.cam = [0, 0.3, 9.6]; HERO_CAM.tgt = [0, -0.45, 0]; HERO_CAM.fov = 34;
+  ROOM_CAM.cam = [0, 6.2, 12.6]; ROOM_CAM.tgt = [0, -0.9, -0.5]; ROOM_CAM.fov = 50;
+  VERD_CAM.cam = [0, -0.2, 8.4]; VERD_CAM.tgt = [0, -1.9, 0.3]; VERD_CAM.fov = 36;
+}
+const LIQ_HERO = col('#e6f1ff'), LIQ_END = col('#eef4ff');
+
+// ═══ BOARDET: 11 anonyme roller, valgt til netop denne pitch ═══════════
+// Serveren (lib/board.mjs, op 'screen') vaelger rollerne ud fra pitchens use-case. Farverne er
+// fast redaktionel palet (bedst laesbar paa lyst papir), kropssproget udledes af temperamentet.
+const PALETTE = ['#1f3a5f', '#9b1b22', '#c08a2b', '#2f5d46', '#1f6f78', '#5b3a63', '#4a5566', '#b0532b', '#6d6a26', '#3f6e9e', '#2b2b2e'];
+// pose 0 albuer paa knaeene · 1 haender paa laarene · 2 haand under hagen · 3 armene over kors · 4 laenet tilbage · 5 aabne arme
+const TEMPER = {
+  skeptisk:     { pose: 3, cross: 0, slump: 0.35, fidget: 0.05 },
+  analytisk:    { pose: 2, cross: 0, slump: 0.1,  fidget: 0.15 },
+  entusiastisk: { pose: 5, cross: 0, slump: 0.0,  fidget: 0.75 },
+  rolig:        { pose: 1, cross: 1, slump: 0.0,  fidget: 0.15 },
+  utaalmodig:   { pose: 0, cross: 0, slump: 0.0,  fidget: 1.0 },
+  afslappet:    { pose: 4, cross: 1, slump: 0.2,  fidget: 0.3 },
+};
+function hash01(s) { let h = 2166136261; for (let k = 0; k < s.length; k++) { h ^= s.charCodeAt(k); h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; }
+function traitsFor(prof, i) {
+  const T = TEMPER[prof.temperament] || TEMPER.rolig, r = (k) => hash01(prof.navn + '|' + k + '|' + i);
+  return { h: 0.95 + r('h') * 0.12, sw: 0.94 + r('s') * 0.14, bl: r('b') * r('b2') * 0.45, pose: T.pose, cross: T.cross, hs: 0.97 + r('q') * 0.08, slump: T.slump, fidget: T.fidget };
+}
+const FALLBACK_PANEL = [
+  ['Kunden i målgruppen', 'Kunden', 'Ville jeg selv betale for det?', 'entusiastisk'],
+  ['Den kræsne kunde', 'Kræsen kunde', 'Kvalitet og oplevelse', 'skeptisk'],
+  ['Branchekenderen', 'Branchekender', 'Sådan fungerer branchen', 'rolig'],
+  ['Konkurrenten', 'Konkurrenten', 'Hvad gør de etablerede', 'analytisk'],
+  ['Økonomichefen', 'Økonomi', 'Cash, dækningsbidrag, payback', 'analytisk'],
+  ['Skeptikeren', 'Skeptiker', 'Hvad vælter idéen', 'skeptisk'],
+  ['Salgschefen', 'Salg', 'Kanaler og kundeanskaffelse', 'utaalmodig'],
+  ['Driftschefen', 'Drift', 'Kan det leveres hver dag', 'rolig'],
+  ['Juristen', 'Jura og tillid', 'Regler, ansvar, tillid', 'analytisk'],
+  ['Produktudvikleren', 'Produkt', 'Test før du bygger', 'entusiastisk'],
+  ['Investoren', 'Investor', 'Skala og timing', 'afslappet'],
+].map((f, i) => ({ id: 'p' + (i + 1), navn: f[0], kort: f[1], linse: f[2], taenker: '', blindspot: '', temperament: f[3] }));
+const P = FALLBACK_PANEL.map((f, i) => ({ id: f.id, s: f.kort, n: f.navn, lens: f.linse, c: PALETTE[i], t: traitsFor(f, i), prof: f }));
+const PBY = {}; P.forEach((p, i) => { PBY[p.id] = i; });
+const VOTE = { for: 'For', imod: 'Imod', betinget: 'Betinget' };
+let PANEL = FALLBACK_PANEL, PANEL_AUTO = false, EMNE = '';
+function setPanel(list, auto) {              // opdaterer P og stolenes figurer; DOM males af paintPanel() i part4
+  PANEL = list; PANEL_AUTO = !!auto;
+  P.forEach((p, i) => { const f = list[i] || FALLBACK_PANEL[i]; p.s = f.kort || f.navn; p.n = f.navn; p.lens = f.linse; p.c = PALETTE[i]; p.t = traitsFor(f, i); p.prof = f; });
+  CH.forEach((c, i) => placeHead(c, P[i]));
+}
+
+// ── forudindspillet demo (bruges uden noegle) ──
+const DEMO_PANEL = [
+  ['Produktdesigneren', 'Produktdesign', 'Fokus og fravalg', 'utaalmodig'],
+  ['Den datadrevne operatør', 'Data og drift', 'Mål det, før du tror det', 'rolig'],
+  ['Innovationsforskeren', 'Innovation', 'Hvilket job løser kunden?', 'analytisk'],
+  ['Ledelsesrådgiveren', 'Ledelse', 'Kunden og formålet', 'afslappet'],
+  ['Produktlederen', 'Produktleder', 'Test før du bygger', 'entusiastisk'],
+  ['Skeptikeren', 'Skeptiker', 'Incitamenter og inversion', 'skeptisk'],
+  ['Automatiseringseksperten', 'Automatisering', 'Software og planlægning', 'afslappet'],
+  ['Risikorådgiveren', 'Risiko', 'Tillid, ansvar, garanti', 'entusiastisk'],
+  ['Vækstmarkedsføreren', 'Vækst', 'Kanaler og selvbetjening', 'rolig'],
+  ['Driftschefen', 'Drift', 'Sæson og kapacitet', 'utaalmodig'],
+  ['Økonomichefen', 'Økonomi', 'Cash, dækningsbidrag, payback', 'rolig'],
+].map((f, i) => ({ id: 'p' + (i + 1), navn: f[0], kort: f[1], linse: f[2], taenker: '', blindspot: '', temperament: f[3] }));
+const DEMO = (() => {
+ const ORD = ['jobs', 'bezos', 'christensen', 'drucker', 'cagan', 'munger', 'lutke', 'levie', 'shah', 'charles', 'cfo'];
+ const id = (k) => { const n = ORD.indexOf(k); return n < 0 ? null : 'p' + (n + 1); };
+ const r1 = {
+  jobs:{udfordring:'Abonnementet gør produktet uklart. Løftet om 48 timer drukner i en månedlig regning.',hvorfor:['Kunden skal tage stilling til et valg hver måned i stedet for at mærke en oplevelse.','Voksencykler og specialdele udvander fokus fra dag ét.'],spoergsmaal:'Hvad er det ene øjeblik, familien fortæller naboen om?',confidence:'høj',blindspot:'Jeg undervurderer, hvor meget stabil månedlig indtægt betyder for jeres cash.',stemme:'betinget'},
+  bezos:{udfordring:'I ved ikke, hvor mange reparationer en familie har om året. Uden det tal er prisen et gæt.',hvorfor:['Den vigtigste måling er afhentninger pr. mekaniker pr. dag, og den kender I ikke endnu.','Prisen kan ændres, men kun hvis I faktisk måler.'],spoergsmaal:'Hvor mange reparationer har en familie med to børn om året?',confidence:'mellem',blindspot:'Jeg tænker langsigtet, og I har måske 12 måneders penge.',stemme:'for'},
+  christensen:{udfordring:'I konkurrerer ikke med værksteder, men med far, en unbrakonøgle og en video. Den er gratis.',hvorfor:['Jobbet er at få barnet af sted på en cykel, der virker, også i morgen kl. 7.30.','Forstår I ikke jobbet, sælger I reparationer ingen efterspørger.'],spoergsmaal:'Hvad gjorde de sidste ti familier, før de fandt jer?',confidence:'mellem',blindspot:'Jeg er stærk på retning og svag på prissætning.',stemme:'betinget'},
+  drucker:{udfordring:'I har to kunder: forælderen der betaler og barnet der cykler. De vil noget forskelligt.',hvorfor:['Forretningens formål er at skabe en kunde, og I har ikke valgt hvilken.','To mekanikere er hele kapaciteten, og den spredes for tyndt.'],spoergsmaal:'Hvad anser forælderen for værdi: tid, tryghed eller pris?',confidence:'mellem',blindspot:'Jeg kender abonnementsmodeller med app og MobilePay dårligt.',stemme:'betinget'},
+  cagan:{udfordring:'Ingen af de fire risici er testet endnu: værdi, brugbarhed, drift og økonomi.',hvorfor:['I har planlagt løsningen, før I har testet om nogen vil betale hver måned.','En ladcykel er en dyr måde at finde ud af, at prisen er forkert.'],spoergsmaal:'Hvordan har I testet, at familierne vil have det her?',confidence:'høj',blindspot:'Jeg tænker i produktteams, og I er to mekanikere og en idé.',stemme:'betinget'},
+  munger:{udfordring:'Skæv selektion: dem med mest slid tegner abonnement, og de opsiger efter sommeren.',hvorfor:['Jeres incitament er at reparere mindst muligt, kundens at bruge jer mest muligt.','Et abonnement ser godt ud i april og dårligt ud i januar.'],spoergsmaal:'Hvad sker der, hvis 30 procent opsiger efter sommeren?',confidence:'høj',blindspot:'Jeg kan være for forsigtig i et marked, hvor den første med tæthed vinder.',stemme:'imod'},
+  lutke:{udfordring:'48 timer holder ikke med håndholdt planlægning, når der kommer 200 familier.',hvorfor:['Ruter, afhentning og påmindelser er et software-problem, ikke et skruenøgle-problem.','Den der ejer planlægningen, ejer marginen.'],spoergsmaal:'Hvad kan I automatisere, før I ansætter mekaniker nummer tre?',confidence:'høj',blindspot:'Jeg overvurderer, hvad værktøj kan løse i et håndværk.',stemme:'for'},
+  levie:{udfordring:'Tillid. Forældre overlader barnets sikkerhed til jer, og én bremse der svigter er nok.',hvorfor:['Ansvar og garanti er ikke nævnt i pitchen.','Tillid er det, der gør jer svære at forlade.'],spoergsmaal:'Hvem hæfter, hvis en bremse svigter efter jeres reparation?',confidence:'mellem',blindspot:'Jeg tænker som en stor virksomhed med tunge processer.',stemme:'betinget'},
+  shah:{udfordring:'Kundeanskaffelse. 149 kr. om måneden tåler ikke en dyr vej til hver eneste familie.',hvorfor:['Små abonnementer dør af salgsomkostninger før de dør af opsigelser.','Salget skal kunne ske på under et minut, uden telefon.'],spoergsmaal:'Hvad koster det at skaffe én ny familie i dag?',confidence:'mellem',blindspot:'Jeg er optimist på selvbetjening.',stemme:'for'},
+  charles:{udfordring:'Sæsonen. April til september er travlt, resten af året står mekanikerne stille.',hvorfor:['I betaler løn tolv måneder om året og tjener penge i seks.','Tomgang om vinteren æder overskuddet fra sommeren.'],spoergsmaal:'Hvad laver mekanikerne i februar?',confidence:'høj',blindspot:'Tempo kan skjule, at kvaliteten svinger.',stemme:'betinget'},
+  cfo:{udfordring:'149 kr. om måneden dækker cirka to reparationer om året. Alt derover er tab.',hvorfor:['Én reparation med afhentning koster 180 til 250 kr. i tid og kørsel.','Et abonnement binder jer, når alle dæk punkterer i september.'],spoergsmaal:'Hvad er jeres dækningsbidrag pr. afhentning efter løn og ladcykel?',confidence:'mellem',blindspot:'Jeg undervægter værdien af at eje kundeforholdet over tid.',stemme:'imod'}
+ };
+ const r2 = {
+  jobs:{target:'munger',forslag:'Gør abonnementet til tryghed, ikke reparation: to faste tjek og hjælp inden 48 timer. Så forsvinder den skæve selektion.',hvordan:['Én pris for to tjek om året','Reparationer ud over koster ekstra','Én side, én knap'],endelig:'Ét løfte, én pris, ingen valgmuligheder.',stemme:'for',confidence:'høj'},
+  bezos:{target:'cfo',forslag:'Mål det tal, I mangler: 60 familier i to prisplaner i 60 dage, og lad dataene sætte prisen.',hvordan:['To prisplaner side om side','Mål afhentninger pr. mekaniker pr. dag','Beslut efter 60 dage'],endelig:'Test prisen, beslut på data.',stemme:'for',confidence:'mellem'},
+  christensen:{target:'drucker',forslag:'Sælg til forælderen, design til barnet. "Cyklen virker i morgen kl. 7.30" er jobbet, I skal love.',hvordan:['Interview ti familier om sidste punktering','Byg løftet om morgenen','Mål tryghed, ikke kun reparationer'],endelig:'Abonnement på tryghed: faste tjek og hurtig hjælp.',stemme:'for',confidence:'mellem'},
+  drucker:{target:'charles',forslag:'Brug vinteren til forebyggelse: vinterklargøring, lys og dæk gør de stille måneder produktive.',hvordan:['Vinterpakke i oktober','Lygter og dæk som tilkøb','Samme kunder, ny opgave'],endelig:'Vælg forælderen som kunde, og fyld året med forebyggelse.',stemme:'betinget',confidence:'mellem'},
+  cagan:{target:'bezos',forslag:'Før prisplanerne: en bookingside i to uger. Tæl tilmeldinger, ikke likes, og byg intet før tallene er der.',hvordan:['Bookingside med to priser','Annoncér i to skoleforældregrupper','Stop hvis under 30 tilmeldinger'],endelig:'Test værdien billigt, før I bygger dyrt.',stemme:'betinget',confidence:'høj'},
+  munger:{target:'shah',forslag:'Ingen gratis afhentning. Giv i stedet første tjek til halv pris mod et års binding.',hvordan:['Årsbinding som standard','Halv pris på første tjek','Opsigelse kun ved sæsonstart'],endelig:'Sælg forebyggelse med binding, ikke fri reparation.',stemme:'betinget',confidence:'høj'},
+  lutke:{target:'levie',forslag:'Byg ruteplan og servicehistorik ind fra dag ét. Det giver både effektivitet og den tillid, du taler om.',hvordan:['Simpel ruteplanlægning','Historik pr. cykel til forælderen','Automatiske påmindelser'],endelig:'Én bookingside der virker, historik fra første cykel.',stemme:'for',confidence:'mellem'},
+  levie:{target:'cfo',forslag:'Læg en garanti og en ansvarsforsikring ind i prisen. Tillid er noget, man kan tage betaling for.',hvordan:['30 dages garanti på reparationer','Ansvarsforsikring fra start','Tjekliste der sendes med cyklen hjem'],endelig:'Enkel booking, klar garanti, historik fra første cykel.',stemme:'betinget',confidence:'mellem'},
+  shah:{target:'munger',forslag:'Brug skoler og børnehaver som kanal. Én aftale giver 30 familier på én gang og næsten ingen salgsomkostning.',hvordan:['Én pilotskole i Hillerød','Fælles afhentningsdag','Henvisningsrabat mellem forældre'],endelig:'Abonnement med loft, solgt gennem skolerne.',stemme:'for',confidence:'mellem'},
+  charles:{target:'drucker',forslag:'Enig i vinteren. Mål timer sparet pr. familie hver uge, og sæt tallet på forsiden. Det er jeres salgstal.',hvordan:['Tæl sparede timer pr. familie','Ugentlig måling','Vis tallet i salget'],endelig:'30 dage, to kvarterer, én pris, målt hver dag.',stemme:'betinget',confidence:'høj'},
+  cfo:{target:'jobs',forslag:'To tjek i abonnementet plus betaling pr. reparation. Det regnestykke kan jeg få hjem på under seks måneder.',hvordan:['Abonnement dækker kun tjek','Reparation afregnes pr. gang','Følg dækningsbidrag pr. afhentning'],endelig:'Abonnér på tjek, betal for reparation.',stemme:'betinget',confidence:'mellem'}
+ };
+ const out = { pitch: 'Cykelværkstedet der kommer til dig. Familier betaler 149 kr. om måneden, og vi henter børnenes cykler, reparerer dem og leverer dem tilbage inden for 48 timer. Vi starter i Hillerød med to mekanikere og en el-ladcykel.',
+  want: 'Er abonnement den rigtige model, eller skal vi tage betaling pr. reparation?', emne: 'Cykelservice på abonnement', r1: {}, r2: {} };
+ ORD.forEach(k => { out.r1[id(k)] = r1[k]; out.r2[id(k)] = Object.assign({}, r2[k], { target: id(r2[k].target) }); });
+ const H = (a) => a.map(id);
+ out.synth = {
+  overskrift:'Sælg trygheden, ikke fri reparation.', dom:'Betinget grønt lys',
+  resume:'Idéen løser et reelt problem for travle familier, men abonnementet som det er formuleret sælger ubegrænsede reparationer til en pris, der kun dækker to om året. Panelet samler sig om at gøre abonnementet til tryghed: faste servicetjek og hjælp inden 48 timer, mens reparationer betales ekstra. Før I køber udstyr, skal prisen og efterspørgslen testes billigt.',
+  udfordringer:[
+   {titel:'Prisen er et gæt',tekst:'Ingen ved endnu, hvor mange reparationer en familie har om året. Ved 149 kr. om måneden bliver alt over to reparationer et tab.',hvem:H(['cfo','bezos','cagan'])},
+   {titel:'Skæv selektion og sæson',tekst:'Dem med mest slid tegner abonnement, og de opsiger efter sommeren. Om vinteren står mekanikerne stille, mens lønnen løber.',hvem:H(['munger','charles'])},
+   {titel:'Tillid og ansvar',tekst:'Forældre overlader barnets sikkerhed til jer. Garanti og ansvar er ikke en del af pitchen i dag.',hvem:H(['levie','drucker'])}],
+  greb:[
+   {titel:'Abonnér på tryghed',tekst:'To faste tjek om året og hjælp inden 48 timer i abonnementet. Reparationer ud over det betales pr. gang.',hvem:H(['jobs','christensen','cfo'])},
+   {titel:'Test før I bygger',tekst:'En bookingside i to uger og derefter to prisplaner i 60 dage. Beslut på tilmeldinger og dækningsbidrag, ikke på mavefornemmelse.',hvem:H(['cagan','bezos'])},
+   {titel:'Skolerne som kanal, vinteren som marked',tekst:'Én aftale med en skole giver 30 familier på én gang. Vinterklargøring gør de stille måneder produktive.',hvem:H(['shah','drucker','charles'])}],
+  uenighed:{om:'Om I skal jagte den perfekte oplevelse først eller hurtige tal først.',kriterie:'Hvor længe I har råd til at lære, før pengene skal være der.'},
+  naeste_skridt:['Byg en bookingside med to priser, og annoncér i to skoleforældregrupper i to uger.','Interview ti familier om deres sidste punktering, og skriv løftet ud fra deres ord.','Regn dækningsbidrag pr. afhentning ud, før ladcyklen købes.'],
+  spoergsmaal:['Hvad er jeres dækningsbidrag pr. afhentning efter løn og kørsel?','Hvor mange reparationer har en typisk familie om året?','Hvad gør familierne i dag, når cyklen går i stykker?','Hvor mange kunder regner I med at miste efter sommeren?','Hvem hæfter, hvis en reparation svigter?'],
+  forbehold:'Panelet er simuleret og kender kun pitchen. Tallene for reparationsomkostninger er panelets egne skøn og skal efterprøves.',
+  panel_eval:{mangler:'Ingen talte for mekanikerne selv. En medarbejder-stemme ville have spurgt, om 48 timer kan holdes en travl uge i april.',redundans:'Produktlederen og Driftschefen vejede begge test-tempo; én af dem kunne sidde over.',forslag:'Tilføj en kunde-stemme: en forælder med to børn, der cykler til skole.'}
+ };
+ return out;
+})();
+
+// ── placering: halvcirkel af 11 stole bag og rundt om draaben, aaben mod kameraet ──
+const DROPC = MOBROOM ? new THREE.Vector3(0, -0.86, 0.6) : new THREE.Vector3(0, -0.74, 0.72);
+const DROPR = MOBROOM ? 0.46 : 0.6, PR = 0.16, CSJ = 0.82;
+const FLOORY = -1.35, SEATYJ = -0.78;
+const sy = (ly) => FLOORY + (ly - FLOORY) * CSJ;          // lokal hoejde -> verden
+function placeHead(c, p) {
+  const T = p.t, fw = T.pose === 0 ? 0.06 : T.pose === 4 ? -0.1 : -0.04;
+  c.head.set(c.x + c.dir.x * fw, sy(SEATYJ + 0.03 + 0.08 + 0.535 * T.h * (T.pose === 0 ? 0.93 : 1)), c.z + c.dir.z * fw);
+}
+const CH = P.map((p, i) => {
+  const th = mix(-1.46, 1.46, i / (P.length - 1)), RX = MOBROOM ? 2.3 : 2.95;
+  const x = RX * Math.sin(th), z = -RX * Math.cos(th) * (MOBROOM ? 0.95 : 0.62) + 0.42;
+  const dx = DROPC.x - x, dz = DROPC.z - z, dl = Math.hypot(dx, dz);
+  const dir = new THREE.Vector3(dx / dl, 0, dz / dl);
+  const c = { x, z, yaw: Math.atan2(dx, dz), dir, a: 0,
+    seat: new THREE.Vector3(x + dir.x * 0.04, sy(SEATYJ + 0.05) + PR * 0.9, z + dir.z * 0.04),
+    head: new THREE.Vector3(),
+    plate: new THREE.Vector3(x + dir.x * 0.42, FLOORY + 0.02, z + dir.z * 0.42),
+    fig: new THREE.Vector4(0, 0, 0, 0) };
+  placeHead(c, p); return c;
+});
+
+// ═══ MOTOR: /api/board (Vercel-function med OpenRouter) eller demo ═════════
+const E = { mode: 'probe', live: false, model: '', code: false };
+const CODEK = 'kb.board.code.v1';
+let ACCESS = ''; try { ACCESS = localStorage.getItem(CODEK) || ''; } catch (e) {}
+try { const q = new URLSearchParams(location.search).get('kode'); if (q) { ACCESS = q; localStorage.setItem(CODEK, q); } } catch (e) {}
+const modelName = (m) => { m = String(m || ''); const b = m.split('/').pop().replace(/-/g, ' ').replace(/^claude /, 'Claude '); return b.replace(/\b(\w)/g, (x) => x.toUpperCase()).replace(/ (\d)/, ' $1'); };
+function paintEngine() {
+  const b = $('#kb-eng'), l = $('#kb-eng-l'); b.dataset.mode = E.mode;
+  l.textContent = E.mode === 'live' ? 'Live · ' + modelName(E.model) : E.mode === 'demo' ? (E.live ? 'Demo · forudindspillet' : 'Demo · ingen nøgle') : 'Finder boardet';
+  $('#kb-go-l').textContent = E.mode === 'demo' ? 'Se boardet arbejde' : 'Pitch for boardet';
+  const ol = $('#opt-live'); ol.classList.toggle('dis', !E.live); ol.querySelector('input').disabled = !E.live;
+  $('#opt-live-t').innerHTML = E.live ? `Din pitch vurderes af 11 roller, valgt til netop din idé (${esc(modelName(E.model))} via OpenRouter).`
+    : 'Serveren har ingen <code>OPENROUTER_API_KEY</code>. Sæt den i Vercel eller i <code>.env.local</code>.';
+}
+async function probeEngine() {
+  if (/^https?:$/.test(location.protocol)) {
+    try { const r = await fetch('/api/health', { cache: 'no-store' }); if (r.ok) { const j = await r.json(); if (j && j.ok) { E.live = !!j.live; E.model = j.model || ''; E.code = !!j.code; } } } catch (e) {}
+  }
+  E.mode = E.live ? 'live' : 'demo';
+  paintEngine();
+}
+function api(op, payload, tries) {
+  return fetch('/api/board', { method: 'POST', headers: { 'content-type': 'application/json', 'x-board-code': ACCESS }, body: JSON.stringify(Object.assign({ op }, payload)) })
+    .then(r => r.json().catch(() => ({})).then(j => {
+      if (r.ok) return j;
+      if (j.code === 'code') {
+        const c = window.prompt(ACCESS ? 'Forkert adgangskode. Prøv igen:' : 'Boardet kræver en adgangskode:', '');
+        if (c) { ACCESS = c.trim(); try { localStorage.setItem(CODEK, ACCESS); } catch (e) {} return api(op, payload, tries); }
+      }
+      if ((r.status >= 500 || r.status === 429) && (tries || 0) < 1 && op !== 'screen') return sleep(700).then(() => api(op, payload, 1));
+      throw { code: j.code || 'http_' + r.status, message: j.error || ('HTTP ' + r.status) };
+    }));
+}
+// hurtigt ordfilter i browseren (serveren har samme + modellens vurdering)
+const BLOCK = /\b(fuck\w*|kneppe\w*|knep|pikken|fisse\w*|kusse\w*|porno\w*|nøgenbilled\w*|sex\s*med\s*b(ø|o)rn|pædofil\w*|pedofil\w*|voldtag\w*|voldtæg\w*|n[i1]gger\w*|neger\w*|perker\w*|luder\w*|lav\w*\s+en\s+bombe|kill\s+(yourself|people))\b/i;
+const quickBlock = (t) => BLOCK.test(String(t || '').normalize('NFC'));
+
+const CHAPTERS = [
+  { n: 1, q: 'Hvad er udfordringerne, I ser?', sub: 'Hver stemme vurderer pitchen for sig selv, uden at have hørt de andre.' },
+  { n: 2, q: 'Hvad skal der til for at gøre det til en succes?', sub: 'Tweak it to love it. Hver stemme bygger videre på en udfordring fra panelet.' },
+  { n: 3, q: 'Sammenfatning', sub: 'Moderatoren samler panelets indstillinger til én rapport.' },
+];
+// tidsrammer (ms): kapitel 1 og 2 har hver en fast ramme; kapitel 3 er en animeret pause paa 6-10 s
+const TIMING = { ch1: 15000, ch2: 15000, ch3min: 6000, ch3max: 10000, ch3grace: 25000, card: 2300 };
+
+// ── smaa hjaelpere ──
+const typo = (s) => String(s == null ? '' : s).replace(/"([^"\n]{1,240})"/g, '»$1«').replace(/ - /g, ', ');
+function esc(s) { return typo(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+function normVote(v) { v = String(v || '').toLowerCase(); return v.indexOf('imod') >= 0 ? 'imod' : (v.indexOf('for') === 0 ? 'for' : 'betinget'); }
+function toast(msg, ms) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), ms || 4500); }
+
+// ═══ INTERAKTION (fra Moving Images-motoren) ═══════════════════
+const ptr = { x: 0, y: 0, sx: 0, sy: 0, vx: 0, vy: 0, has: false, t: 0, cx: -99, cy: -99, over: false };
+const UI_SEL = 'a,button,input,textarea,label,.cmp,#rp,#rm-log,#rm-card,#eng-pop,.seatlab,#rm-status,.bub,#rm-ch,#rm-press,#kb-reject,#rm-chat';
+addEventListener('pointermove', (e) => {
+  const x = e.clientX / innerWidth * 2 - 1, y = -(e.clientY / innerHeight * 2 - 1), now = performance.now();
+  const dtp = Math.max((now - ptr.t) / 1000, 1 / 240);
+  if (ptr.has && dtp < 0.1) { ptr.vx += ((x - ptr.x) / dtp - ptr.vx) * 0.5; ptr.vy += ((y - ptr.y) / dtp - ptr.vy) * 0.5; }
+  ptr.x = x; ptr.y = y; ptr.t = now; ptr.has = true; ptr.cx = e.clientX; ptr.cy = e.clientY;
+  ptr.over = !!(e.target.closest && e.target.closest(UI_SEL));
+}, { passive: true });
+document.addEventListener('pointerleave', () => { ptr.has = false; });
+let wobKick = 0; const kick = (a) => { wobKick = Math.min(wobKick + a, 0.07); };
+const ripples = [];
+const drops = Array.from({ length: NDROP }, () => ({ c: new THREE.Vector3(), r: 0, liq: new THREE.Color() }));
+const TOUCH = [0];
+const pcol = P.map(p => new THREE.Color(p.c));
+const WHITE = new THREE.Color(1, 1, 1);
+let camPos = new THREE.Vector3(), camRot = new THREE.Matrix3(), tanF = 0.27;
+const rayFromNDC = (x, y) => new THREE.Vector3(x * tanF * persp.aspect, y * tanF, -1).applyMatrix3(camRot).normalize();
+function hitDrop(rd) {
+  const d = drops[0]; if (d.r < 0.25) return null;
+  const oc = camPos.clone().sub(d.c); const b = oc.dot(rd), c = oc.lengthSq() - d.r * d.r, h = b * b - c;
+  if (h <= 0) return null; const t = -b - Math.sqrt(h); if (t <= 0) return null;
+  const p = camPos.clone().addScaledVector(rd, t); return { i: 0, p, n: p.clone().sub(d.c).normalize() };
+}
+function hitFigure(rd) {           // klik paa en figur: kugle om hoved+krop
+  let best = -1, bt = 1e9;
+  CH.forEach((c, k) => { if (c.fig.x < 0.5) return; const ctr = tmpW.copy(c.head).add(new THREE.Vector3(0, -0.22, 0)); const rr = 0.3;
+    const oc = camPos.clone().sub(ctr); const b = oc.dot(rd), cc = oc.lengthSq() - rr * rr, h = b * b - cc;
+    if (h > 0) { const t = -b - Math.sqrt(h); if (t > 0 && t < bt) { bt = t; best = k; } } });
+  return best;
+}
+function ripple(p, a) { ripples.push({ p: p.clone(), t0: clock, a }); if (ripples.length > NRIP) ripples.shift(); }
+const JELLY = Array.from({ length: NDROP }, () => ({ o: new THREE.Vector3(), v: new THREE.Vector3() }));
+const free = [];
+let drag = null, press = null, wakeT = 0, flickT = 0;
+const tend = { a: new THREE.Vector4(), m: new THREE.Vector4(), b: new THREE.Vector4(), on: 0 };
+addEventListener('pointerdown', (e) => {
+  if (e.target.closest(UI_SEL)) return;
+  const x = e.clientX / innerWidth * 2 - 1, y = -(e.clientY / innerHeight * 2 - 1);
+  const rd = rayFromNDC(x, y), h = hitDrop(rd);
+  if (!h) { const fi = hitFigure(rd); if (fi >= 0) openCard(fi); else closeCard(); return; }
+  press = { t: clock, x: e.clientX, y: e.clientY, h };
+  if (e.pointerType === 'mouse' && !REDUCED) {
+    const d = drops[0];
+    drag = { par: 0, depth: h.p.distanceTo(camPos), tgt: h.p.clone(), tip: h.p.clone(), r: 0 };
+    document.body.style.userSelect = 'none'; e.preventDefault();
+    ripple(h.p, 0.012); JELLY[0].v.addScaledVector(h.n, -0.6 * d.r);
+  }
+});
+function release(snap) {
+  if (!drag) return;
+  const d = drops[drag.par];
+  if (drag.r > 0.02) { const v = d.c.clone().sub(drag.tip).multiplyScalar(snap ? 0.4 : 1.6); spawnFree(drag.tip, v, drag.r * 0.9, drag.par, snap ? 0.35 : 0.0); tend.b.w = 0; }
+  ripple(d.c.clone().addScaledVector(drag.tip.clone().sub(d.c).normalize(), d.r), 0.022);
+  kick(0.03); drag = null; document.body.style.userSelect = '';
+}
+addEventListener('pointerup', (e) => {
+  if (press && clock - press.t < 0.28 && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 8) {
+    ripple(press.h.p, 0.03); kick(0.035); JELLY[0].v.addScaledVector(press.h.n, -0.9 * drops[0].r);
+    if (drag) drag.r = 0;
+  }
+  release(false); press = null;
+});
+addEventListener('blur', () => release(false));
+function spawnFree(p, v, r, par, hold) { free.length = 0; free.push({ p: p.clone(), v: v.clone(), r, par, t: 0, hold }); }
+
+// ═══ SCENE-STATE ═══════════════════════════════════════════════
+const bubSeed = Array.from({ length: NBUB }, (_, i) => { const a = i * 2.39996, y = (i * 0.618) % 1; return { a, rr: Math.sqrt(((i * 0.371) % 1)) * 0.62, y, sp: 0.07 + ((i * 0.53) % 1) * 0.1, r: 0.02 + ((i * 0.77) % 1) * 0.045 }; });
+const tmpV = new THREE.Vector3(), tmpW = new THREE.Vector3();
+const camTgt = new THREE.Vector3(), vA = new THREE.Vector3(), vB = new THREE.Vector3();
+function introState(t) {
+  if (REDUCED) return { y: 0, sy: 1, w: 0 };
+  const T = 0.95;
+  if (t < 0) return { y: 4.2, sy: 1.25, w: 0 };
+  if (t < T) { const k = t / T; return { y: 4.2 * (1 - k * k), sy: 1 + 0.26 * k, w: 0 }; }
+  const tt = t - T;
+  return { y: -0.2 * Math.exp(-3.4 * tt) * Math.sin(tt * 7.2), sy: 1 - 0.28 * Math.exp(-3.6 * tt) * Math.cos(tt * 9.5), w: 0.06 * Math.exp(-1.8 * tt) };
+}
+function sceneState(t, tIntro) {
+  const intro = introState(tIntro);
+  const bob = Math.sin(t * 0.55) * 0.05;
+  drops.forEach(d => { d.r = 0; d.c.set(0, 0, 0); });
+  drops[0].liq.copy(LIQ_HERO);
+  drops[0].c.set(0, bob + intro.y, 0); drops[0].r = 1.0;
+  return { k: 0.5, stretch: intro.sy, introW: intro.w };
+}
+
+// ═══ RUMMET ════════════════════════════════════════════════════
+const R = { phase: 'idle', tA: 0, tH: 0, tAs: 0, tRet: 0, tV: 0, w: 0, v: 0, hum: 0, speakers: [], target: {}, msgs: [], msgSlot: 0, twitch: 0,
+  pers: P.map(() => ({ landed: false, bt: -99, think: false, grown: 0 })) };
+const ROOM_ON = new Set(['assemble', 'council', 'return']);
+function signedYaw(from, to) { return Math.atan2(from.x * to.z - from.z * to.x, from.x * to.x + from.z * to.z); }
+function roomDrops(t, dt) {
+  const d0 = drops[0], w = ease(R.w), v = ease(R.v);
+  if (w > 0.0005) { d0.c.lerp(DROPC, w); d0.r = mix(d0.r, DROPR, w); }
+  if (v > 0.0005) { d0.c.y = mix(d0.c.y, -0.12, v); d0.r = mix(d0.r, 1.0, v); d0.liq.lerp(LIQ_END, v); }
+  if (R.hum > 0.01) d0.r *= 1 + 0.014 * Math.sin(t * 13.0) * R.hum;
+  let any = false;
+  CH.forEach((c, i) => {
+    let a;
+    if (ROOM_ON.has(R.phase)) a = FORCE_ROOM ? 1 : ease((t - R.tAs - 0.3 - Math.abs(i - 5) * 0.1) / 1.25);
+    else if (R.phase === 'verdict') a = FORCE_ROOM ? 0 : 1 - ease((t - R.tV - 0.1 - Math.abs(i - 5) * 0.05) / 1.1);
+    else a = Math.max(0, c.a - dt * 1.4);
+    c.a = a;
+    U.uChair.value[i].set(c.x, -(1 - a) * 1.45, c.z, c.yaw); U.uChairA.value[i] = a > 0.002 ? 1 : 0; if (a > 0.002) any = true;
+  });
+  U.uChairOn.value = any ? 1 : 0;
+  const speaking = new Set(R.speakers);
+  P.forEach((p, i) => {
+    const s = drops[1 + i], ps = R.pers[i], c = CH[i];
+    s.r = 0; let grow = 0;
+    if (R.phase === 'assemble' || R.phase === 'council') {
+      const u = FORCE_ROOM ? 9 : t - (R.tAs + 1.5 + Math.abs(i - 5) * 0.2 + (i < 5 ? 0.05 : 0));
+      if (u >= 0) {
+        const dir = tmpV.copy(c.seat).sub(d0.c).normalize();
+        const bud = tmpW.copy(d0.c).addScaledVector(dir, d0.r * 0.6);
+        if (u < 0.32) { s.c.copy(bud); s.r = PR * ease(u / 0.32); s.liq.copy(d0.liq); }
+        else if (u < 1.12) { const f = (u - 0.32) / 0.8, fe = sstep(0, 1, f); s.c.copy(bud).lerp(c.seat, fe); s.c.y += 1.2 * 4 * f * (1 - f); s.r = PR; s.liq.copy(d0.liq).lerp(pcol[i], fe); }
+        else {
+          if (!ps.landed) { ps.landed = true; ps.bt = t; ripple(c.seat.clone().add(new THREE.Vector3(0, -PR * 0.9, 0)), 0.02); }
+          const g = clamp((u - 1.12) / 1.0); grow = ease(g);
+          s.c.copy(c.seat); s.c.y += grow * 0.18; s.r = PR * (1 - sstep(0.0, 0.7, g)); s.liq.copy(pcol[i]);
+        }
+      }
+    } else if (R.phase === 'return') {
+      const f0 = FORCE_ROOM ? 9 : t - R.tRet - Math.abs(i - 5) * 0.07;
+      grow = 1 - ease(f0 / 0.55);
+      if (f0 > 0.3 && f0 < 1.5) {
+        const f = clamp((f0 - 0.3) / 1.1), fe = sstep(0, 1, f);
+        s.c.copy(c.seat).lerp(d0.c, fe); s.c.y += 0.95 * 4 * f * (1 - f); s.r = PR * sstep(0, 0.2, f) * (1 - sstep(0.75, 1, f)); s.liq.copy(pcol[i]);
+      }
+    }
+    // gestik: taleren laener sig frem og gestikulerer, de andre vender sig mod taleren
+    const talk = speaking.has(i);
+    let turnT = 0, leanT = 0.08, gestT = 0;
+    if (talk) {
+      leanT = 0.75; gestT = 0.55 + 0.45 * Math.sin(t * 3.4 + i);
+      const tg = R.target[i]; if (tg != null) turnT = signedYaw(c.dir, tmpV.copy(CH[tg].head).sub(c.head).setY(0).normalize());
+    } else if (R.speakers.length) {
+      const sp = R.speakers[R.speakers.length - 1]; if (sp !== i) { turnT = signedYaw(c.dir, tmpV.copy(CH[sp].head).sub(c.head).setY(0).normalize()); leanT = 0.22; }
+    } else if (ps.think) { leanT = 0.3 + 0.12 * Math.sin(t * 1.3 + i * 2.1); gestT = 0.12; }
+    turnT = clamp(turnT, -0.75, 0.75);
+    const k = FORCED ? 1 : 1 - Math.exp(-dt * 4);
+    c.fig.x = grow;
+    c.fig.y += (leanT - c.fig.y) * k; c.fig.z += (turnT - c.fig.z) * k; c.fig.w += (gestT - c.fig.w) * k;
+    const bt = t - ps.bt; const hop = bt < 2.4 ? 0.1 * Math.exp(-bt * 3.4) * Math.abs(Math.sin(bt * 9)) : 0;
+    const T = p.t, fz = T.fidget;
+    const idleLean = 0.03 * Math.sin(t * (0.9 + fz) + i * 1.7) * (0.4 + fz);   // aandedraet og uro efter temperament
+    const nod = talk ? 0.08 * Math.sin(t * 5.2 + i) : (R.speakers.length && !talk ? 0.05 + 0.04 * Math.sin(t * 1.6 + i) : 0.02 * Math.sin(t * 0.7 + i));
+    U.uFig.value[i].set(c.fig.x, c.fig.y + hop * 3 + idleLean, c.fig.z, c.fig.w);
+    U.uFigB.value[i].set(T.h, T.sw, T.bl, T.pose);
+    U.uFigQ.value[i].set(T.cross, T.hs, T.slump, nod);
+    U.uFigC.value[i].set(pcol[i].r, pcol[i].g, pcol[i].b);
+    U.uFigG.value[i] += ((talk ? 1 : ps.think ? 0.22 : 0.1) - U.uFigG.value[i]) * k;
+  });
+  R.msgs = R.msgs.filter((m) => {
+    const f = (t - m.t0) / m.dur, slot = drops[m.slot];
+    if (f >= 1) { slot.r = 0; if (!m.hit) { m.hit = true; ripple(CH[m.to].head.clone(), 0.02); R.pers[m.to].bt = t; } return false; }
+    const a = CH[m.from].head, b = CH[m.to].head;
+    slot.c.copy(a).lerp(b, sstep(0, 1, f)); slot.c.y += 0.9 * 4 * f * (1 - f) + 0.15; slot.r = 0.06 * sstep(0, 0.14, f) * (1 - sstep(0.9, 1, f)); slot.liq.copy(pcol[m.from]);
+    return true;
+  });
+  if ((R.phase === 'hum' || R.phase === 'absorb' || R.phase === 'council') && clock - R.twitch > (R.phase === 'council' ? 0.45 : 0.22)) {
+    const n = new THREE.Vector3(Math.random() - .5, Math.random() * .8, Math.random() * .6 + .2).normalize();
+    ripple(d0.c.clone().addScaledVector(n, d0.r), R.phase === 'council' ? 0.006 : 0.008 + 0.006 * R.hum); R.twitch = clock;
+  }
+}
+
+// ── DOM: navneskilte og talebobler ──
+const seatHost = $('#rm-seats'), bubHost = $('#rm-bubs');
+const labs = P.map((p, i) => {
+  const el = document.createElement('div'); el.className = 'seatlab';
+  el.innerHTML = `<b></b><div><u></u></div>`;
+  el.addEventListener('click', () => openCard(i));
+  seatHost.appendChild(el); return el;
+});
+const bubs = P.map(() => {
+  const el = document.createElement('div'); el.className = 'bub think';
+  el.innerHTML = `<span class="dots"><i></i><i></i><i></i></span><div class="who"></div><q></q>`;
+  bubHost.appendChild(el); return el;
+});
+function paintPanel() {           // efter setPanel(): farver, navneskilte, fremdriftsbjaelke
+  P.forEach((p, i) => {
+    pcol[i].set(p.c);
+    labs[i].style.setProperty('--c', p.c); labs[i].querySelector('b').textContent = p.s || p.n; labs[i].title = p.n + ' · ' + p.lens;
+    bubs[i].style.setProperty('--c', p.c);
+  });
+  const bar = chEl.querySelector('.bar'); bar.innerHTML = P.map(p => `<i style="--c:${p.c}"></i>`).join('');
+}
+function setVote(i, v) { const u = labs[i].querySelector('u'); const vv = normVote(v); u.className = 'on ' + vv; u.textContent = VOTE[vv]; }
+function project(v) { tmpV.copy(v).project(persp); return { x: (tmpV.x * 0.5 + 0.5) * innerWidth, y: (-tmpV.y * 0.5 + 0.5) * innerHeight }; }
+function placeOverlays() {
+  const show = ROOM_ON.has(R.phase);
+  const placed = [];
+  // boblerne maa aldrig gaa op i kapitel-overskriften
+  let minTop = 64;
+  if (chEl.classList.contains('on') && chEl.classList.contains('top')) minTop = chEl.getBoundingClientRect().bottom + 10;
+  const hits = (l, t, w, h) => placed.some(r => l < r.r + 8 && l + w > r.l - 8 && t < r.b + 8 && t + h > r.t - 8);
+  const RW = document.body.classList.contains('chat') && !document.body.classList.contains('ch3') ? innerWidth - 352 : innerWidth;
+  const fits = (l, t, w, h) => l >= 14 && l + w <= RW - 14 && t >= minTop && t + h <= innerHeight - 10 && !hits(l, t, w, h);
+  CH.forEach((c, i) => {
+    const vis = show ? sstep(0.6, 1, c.fig.x) : 0;
+    const hp0 = project(tmpW.copy(c.head).add(new THREE.Vector3(0, 0.14, 0)));
+    const el = labs[i];
+    el.style.opacity = vis.toFixed(3); el.style.pointerEvents = vis > 0.5 ? 'auto' : 'none'; el.style.cursor = 'pointer';
+    el.style.transform = `translate3d(${hp0.x.toFixed(1)}px, ${(hp0.y - el.offsetHeight + (1 - vis) * 10).toFixed(1)}px, 0)`;
+    const b = bubs[i], talk = b.classList.contains('speak'), think = R.pers[i].think && !talk;
+    const on = vis > 0.5 && (talk || think);
+    b.classList.toggle('on', on); b.classList.toggle('think', !talk);
+    if (!on && !talk) return;
+    const hp = hp0;
+    const bw = b.offsetWidth, bh = b.offsetHeight;
+    let left = hp.x - bw / 2; left = clamp(left, 14, RW - bw - 14);
+    let top = Math.max(minTop, hp.y - el.offsetHeight - bh - 8);
+    if (talk) {                      // samtidige bobler: proev ved siden af, derefter ovenover/nedenunder, aldrig i overskriften
+      if (hits(left, top, bw, bh)) {
+        const cands = [];
+        placed.forEach(r => { cands.push([r.r + 12, top], [r.l - bw - 12, top], [left, r.t - bh - 12], [left, r.b + 12], [r.r + 12, r.b + 12], [r.l - bw - 12, r.b + 12]); });
+        const ok = cands.map(([l, t]) => [clamp(l, 14, RW - bw - 14), t]).filter(([l, t]) => fits(l, t, bw, bh))
+          .sort((a, b2) => Math.hypot(a[0] - left, a[1] - top) - Math.hypot(b2[0] - left, b2[1] - top));
+        if (ok.length) { left = ok[0][0]; top = ok[0][1]; }
+      }
+      placed.push({ l: left, r: left + bw, t: top, b: top + bh });
+    } else if (hits(left, top, bw, bh)) { b.classList.remove('on'); return; }
+    b.style.setProperty('--tx', clamp(hp.x - left, 18, bw - 18) + 'px');
+    b.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0) scale(${talk ? 1 : 0.9})`;
+    b.style.zIndex = talk ? 5 : 1;
+  });
+}
+function dropScreen() { return project(drops[0].c); }
+
+// ═══ FORLOEBET ═══════════════════════════════════════════════════
+// Alt starter i baggrunden i det sekund pitchen sendes: vaern + profiler -> 11 udfordringer (parallelt)
+// -> 11 greb (saa snart udfordringerne er inde) -> rapporten (saa snart grebene er inde).
+// Det man SER er tidsstyret: kapitel 1 og 2 har hver en fast ramme, kapitel 3 er en animeret pause.
+let RUNID = 0, LOG = [], R1 = {}, R2 = {}, SY = null, CUR = null, SESSION = null, skipCh = false, wakers = [], lastErr = null;
+function wait(ms) {
+  return new Promise((res) => { let done = false; const tm = setTimeout(fin, ms); function fin() { if (done) return; done = true; clearTimeout(tm); res(); } wakers.push(fin); });
+}
+function wake() { const w = wakers; wakers = []; w.forEach(f => f()); }
+const setSt = (t) => { $('#rm-st').textContent = t; };
+function logPush(e) { LOG.push(e); $('#rm-count').textContent = String(Math.max(0, LOG.length - 1)); renderLog(); }
+function renderLog() {
+  let h = '', lastR = null;
+  LOG.forEach((e) => {
+    if (e.round !== lastR) { lastR = e.round; h += `<div class="lg-r">${e.round === 1 ? 'Kapitel 1 · udfordringerne' : e.round === 2 ? 'Kapitel 2 · tweak it to love it' : 'Pitchen'}</div>`; }
+    if (e.round === 0) { h += `<div class="lg" style="--c:var(--accent)"><i></i><b>Din pitch</b><p>${esc(e.text)}</p>${e.sub ? '<ul><li>Vil gå hjem med: ' + esc(e.sub) + '</li></ul>' : ''}</div>`; return; }
+    const p = P[PBY[e.pid]], tg = e.target != null && PBY[e.target] != null ? P[PBY[e.target]] : null;
+    h += `<div class="lg" style="--c:${p.c}"><i></i><b>${esc(p.n)}${tg ? ' <s>til ' + esc(tg.n) + '</s>' : ''}</b><p>${esc(e.text)}</p>${e.list && e.list.length ? '<ul>' + e.list.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : ''}</div>`;
+  });
+  $('#rm-list').innerHTML = h || '<div class="lg-r">Rummet er stille</div>';
+  const l = $('#rm-list'); l.scrollTop = l.scrollHeight;
+}
+function throwArg(i, j) { const slot = 12 + (R.msgSlot++ % 3); R.msgs.push({ from: i, to: j, t0: clock, dur: 1.0, slot }); }
+// én replik: boble ved figuren i 'dur' ms, samme tekst i chatpanelet
+function showLine(it, dur) {
+  if (it.run !== RUNID) return;
+  const i = PBY[it.pid], p = P[i], b = bubs[i];
+  R.pers[i].think = false; R.pers[i].bt = clock;
+  const j = it.target != null ? PBY[it.target] : null;
+  if (j != null && j !== i) { R.target[i] = j; throwArg(i, j); } else delete R.target[i];
+  R.speakers = R.speakers.filter(x => x !== i).concat(i);
+  labs[i].classList.add('speaking'); setVote(i, it.vote);
+  ripple(CH[i].head.clone(), 0.016);
+  const tg = j != null ? P[j] : null;
+  const words = typo(it.text).split(/\s+/).filter(Boolean);
+  const per = REDUCED ? 0 : Math.min(55, 900 / Math.max(1, words.length));
+  b.querySelector('.who').innerHTML = `<i class="dt"></i><b>${esc(p.n)}</b>${tg ? `<em>til <span style="--tc:${tg.c}">${esc(tg.n)}</span></em>` : `<em>${it.round === 1 ? 'ser en udfordring' : 'foreslår'}</em>`}`;
+  b.querySelector('q').innerHTML = words.map((w, k) => `<span class="w" style="animation-delay:${k * per}ms">${esc(w)}</span>`).join(' ');
+  b.classList.add('speak'); b.classList.remove('think');
+  chatLine(i, j != null && j !== i ? j : null, it.text);
+  const my = RUNID, tok = (b._tok = (b._tok || 0) + 1);
+  setTimeout(() => { if (my !== RUNID || b._tok !== tok) return; endLine(i); }, dur);
+}
+function endLine(i) { bubs[i].classList.remove('speak'); labs[i].classList.remove('speaking'); R.speakers = R.speakers.filter(x => x !== i); delete R.target[i]; }
+function absorb(text) {
+  const ta = $('#kb-idea').getBoundingClientRect();
+  const words = text.split(/\s+/).filter(Boolean).slice(0, 48);
+  const cols = Math.max(4, Math.round(ta.width / 85));
+  return Promise.all(words.map((w, i) => new Promise((res) => {
+    if (REDUCED) { res(); return; }
+    const s = document.createElement('span'); s.className = 'fly'; s.textContent = w; document.body.appendChild(s);
+    const sx = ta.left + 12 + ((i % cols) / cols) * (ta.width - 50), sy0 = Math.min(ta.top + 14 + Math.floor(i / cols) * 24, ta.bottom - 18);
+    const tg = dropScreen(); const tx = tg.x - sx - s.offsetWidth / 2, ty = tg.y - sy0;
+    const cx = tx * 0.45 + (Math.random() - .5) * 220, cy = ty * 0.5 - 120 - Math.random() * 120;
+    const an = s.animate([
+      { transform: `translate(${sx}px,${sy0}px) scale(1)`, opacity: 1, filter: 'blur(0px)' },
+      { transform: `translate(${sx + cx}px,${sy0 + cy}px) scale(.92)`, opacity: 1, offset: .55 },
+      { transform: `translate(${sx + tx}px,${sy0 + ty}px) scale(.12)`, opacity: 0, filter: 'blur(4px)' }
+    ], { duration: 1200 + Math.random() * 350, delay: i * 26, easing: 'cubic-bezier(.55,0,.35,1)', fill: 'forwards' });
+    an.onfinish = () => { s.remove(); const d = drops[0]; const n = camPos.clone().sub(d.c).normalize(); n.x += (Math.random() - .5) * 0.9; n.y += (Math.random() - .5) * 0.9; n.normalize();
+      ripple(d.c.clone().addScaledVector(n, d.r), 0.014); kick(0.008); res(); };
+  })));
+}
+const DJ = [0.3, 1.9, 0.9, 2.6, 1.4, 0.5, 2.2, 1.1, 3.0, 0.7, 1.7];
+function demoCall(kind, p, i) {
+  const src = kind === 1 ? DEMO.r1[p.id] : DEMO.r2[p.id];
+  return sleep((kind === 1 ? 700 : 500) + DJ[i] * 900).then(() => JSON.parse(JSON.stringify(src)));
+}
+function errText(err) {
+  const c = (err && err.code) || '', m = (err && err.message) || String(err || '');
+  if (c === 'nokey') return 'Serveren har ingen OpenRouter-nøgle. Sæt OPENROUTER_API_KEY i Vercel, eller brug demoen.';
+  if (c === 'rate') return m;
+  if (c === 'code') return 'Boardet kræver en adgangskode.';
+  if (c === 'token') return m;
+  if (err instanceof TypeError || /fetch/i.test(m)) return 'Kaldet nåede ikke frem til serveren. Tjek forbindelsen og prøv igen.';
+  return 'Boardet fik en fejl: ' + m.slice(0, 160);
+}
+function start() {
+  let pitch = $('#kb-idea').value.trim(), want = $('#kb-want').value.trim();
+  if (E.mode === 'probe') { toast('Et øjeblik, boardet finder sin motor.'); return; }
+  if (quickBlock(pitch + ' ' + want)) { rejectPitch('Boardet behandler ikke den slags indhold. Prøv med en forretningsidé.'); return; }
+  if (E.mode === 'demo') {
+    if (pitch && pitch !== DEMO.pitch) toast(E.live ? 'Demoen viser en forudindspillet pitch. Vælg "Live" under motor for at få din egen idé vurderet.' : 'Demoen viser en forudindspillet pitch. Sæt en OpenRouter-nøgle på serveren for at få din egen idé vurderet.', 7000);
+    pitch = DEMO.pitch; want = DEMO.want; $('#kb-idea').value = pitch; $('#kb-want').value = want;
+  }
+  if (pitch.length < 25) { toast('Giv boardet lidt mere at arbejde med: hvad er idéen, for hvem, og hvad koster den?'); $('#kb-idea').focus(); return; }
+  CUR = { pitch, want, mode: E.mode, model: E.model };
+  run(++RUNID);
+}
+const alive = (my) => my === RUNID;
+function think(ids, on) { ids.forEach(i => { R.pers[i].think = on; }); }
+// ── chatpanel: samtalen i tekst, synkront med boblerne ──
+let CHAT = innerWidth > 1000, chatN = 0;
+try { const v = localStorage.getItem('kb.board.chat'); if (v === '0') CHAT = false; } catch (e) {}
+function paintChat() { document.body.classList.toggle('chat', CHAT && innerWidth > 1000); }
+function chatClear(pitch) { chatN = 0; $('#chat-list').innerHTML = pitch ? `<div class="cm-pitch">${esc(pitch)}</div>` : ''; $('#chat-n').textContent = ''; $('#chat-pn').textContent = '0'; }
+function chatAdd(html) { const l = $('#chat-list'); l.insertAdjacentHTML('beforeend', html); l.scrollTop = l.scrollHeight; }
+function chatChapter(n) { chatAdd(`<div class="cm-ch">Kapitel ${n} &middot; ${esc(CHAPTERS[n - 1].q)}</div>`); }
+function chatLine(i, j, text) {
+  const p = P[i], tg = j != null ? P[j] : null; chatN++;
+  $('#chat-n').textContent = chatN + ' replikker'; $('#chat-pn').textContent = String(chatN);
+  chatAdd(`<div class="cm" style="--c:${p.c}"><i></i><b>${esc(p.n)}${tg ? ` <s>til</s> <span style="color:${tg.c}">${esc(tg.n)}</span>` : ''}</b><p>${esc(text)}</p></div>`);
+}
+$('#chat-min').addEventListener('click', () => { CHAT = false; paintChat(); try { localStorage.setItem('kb.board.chat', '0'); } catch (e) {} });
+$('#chat-pill').addEventListener('click', () => { CHAT = true; paintChat(); try { localStorage.setItem('kb.board.chat', '1'); } catch (e) {} });
+addEventListener('resize', paintChat);
+paintChat();
+
+// ── kapitler: stort titelkort, derefter overskrift i toppen med fremdrift og nedtaelling ──
+const chEl = $('#rm-ch');
+paintPanel();
+function showChapter(n, total) {
+  const C = CHAPTERS[n - 1];
+  chEl.querySelector('.ce').textContent = `Kapitel ${n} af 3`;
+  chEl.querySelector('.cq').textContent = C.q;
+  chEl.querySelector('.cs').textContent = C.sub;
+  if (n < 3) chatChapter(n);
+  chEl.querySelectorAll('.steps i').forEach((s, k) => { s.className = k < n - 1 ? 'done' : k === n - 1 ? 'now' : ''; });
+  setProgress(0, total || P.length, n === 3);
+  chEl.classList.remove('top'); chEl.classList.add('on', 'intro'); document.body.classList.add('chintro');
+  return wait(REDUCED ? 400 : TIMING.card - 500).then(() => { chEl.classList.remove('intro'); chEl.classList.add('top'); document.body.classList.remove('chintro'); return wait(REDUCED ? 0 : 500); });
+}
+function setProgress(k, total, indet) {
+  const bar = chEl.querySelector('.bar');
+  bar.classList.toggle('indet', !!indet);
+  [...bar.children].forEach((el, i) => el.classList.toggle('on', !indet && i < k));
+  chEl.querySelector('.cp').textContent = indet ? 'Moderatoren skriver rapporten' : `${k} af ${total} har talt`;
+}
+function markSpoke(id) { const bar = chEl.querySelector('.bar'); const el = bar.children[PBY[id]]; if (el) el.classList.add('on'); }
+function setClock(ms) { const t = chEl.querySelector('.ct'); if (t) t.textContent = ms > 0 ? Math.ceil(ms / 1000) + ' s' : ''; }
+function hideChapter() { chEl.classList.remove('on', 'intro', 'top'); document.body.classList.remove('chintro'); setClock(0); }
+
+// ── baggrundsarbejdet ──
+function background(my, live) {
+  const S = { q1: [], q2: [], r1n: 0, r2n: 0, r2expect: 0, synth: null };
+  const call1 = (p, i) => live ? api('r1', Object.assign({ pid: p.id }, SESSION)).then(j => j.res) : demoCall(1, p, i);
+  const call2 = (p, i, r1s) => live ? api('r2', Object.assign({ pid: p.id, r1: r1s }, SESSION)).then(j => j.res) : demoCall(2, p, i);
+  const r1s = () => { const o = {}; P.forEach(p => { if (R1[p.id]) o[p.id] = { udfordring: R1[p.id].udfordring, stemme: R1[p.id].stemme }; }); return o; };
+  const r1All = Promise.allSettled(P.map((p, i) => call1(p, i).then((res) => {
+    if (!alive(my)) return;
+    res.hvorfor = [].concat(res.hvorfor || []).slice(0, 3); res.udfordring = res.udfordring || '';
+    R1[p.id] = res; S.r1n++;
+    logPush({ round: 1, pid: p.id, text: res.udfordring, list: res.hvorfor.concat(res.spoergsmaal ? ['Spørger: ' + res.spoergsmaal] : []) });
+    S.q1.push({ run: my, round: 1, pid: p.id, text: res.udfordring, vote: res.stemme });
+  }, (err) => { if (!alive(my)) return; R1[p.id] = null; lastErr = err; R.pers[i].think = false; }))).then(() => { S.r1done = true; });
+  // kapitel 2-kaldene starter naar alle udfordringer er inde, dog senest 9 s efter start (med dem der er)
+  const r2All = Promise.race([r1All, sleep(9000)]).then(() => {
+    if (!alive(my)) return;
+    const ok = P.filter(p => R1[p.id]); S.r2expect = ok.length;
+    if (!ok.length) { S.dead = lastErr || new Error('Ingen svar'); return; }
+    const snap = r1s();
+    return Promise.allSettled(ok.map((p) => call2(p, PBY[p.id], snap).then((res) => {
+      if (!alive(my)) return;
+      if (PBY[res.target] == null || !R1[res.target] || res.target === p.id) res.target = null;
+      R2[p.id] = res; S.r2n++;
+      logPush({ round: 2, pid: p.id, target: res.target, text: res.forslag, list: [].concat(res.hvordan || []).concat(res.endelig ? ['Endelig: ' + res.endelig] : []) });
+      S.q2.push({ run: my, round: 2, pid: p.id, target: res.target, text: res.forslag, vote: res.stemme });
+    }, (err) => { if (!alive(my)) return; lastErr = err; })));
+  }).then(() => { S.r2done = true; });
+  // rapporten skrives saa snart grebene er inde, dog senest 20 s efter start (med dem der er)
+  S.synthP = Promise.race([r2All, sleep(20000)]).then(() => {
+    if (!alive(my) || S.dead) return null;
+    if (!live) return sleep(1800).then(() => JSON.parse(JSON.stringify(DEMO.synth)));
+    const r2s = {}; P.forEach(p => { const b = R2[p.id]; if (b) r2s[p.id] = { target: b.target, forslag: b.forslag, endelig: b.endelig, stemme: b.stemme }; });
+    return api('synth', Object.assign({ r1: r1s(), r2: r2s }, SESSION)).then(j => j.res);
+  }).then((sy) => { S.synth = sy; S.synthDone = true; return sy; }, (e) => { lastErr = e; S.synthDone = true; return null; });
+  return S;
+}
+// ét kapitel i en fast tidsramme: vis de svar der er kommet, fordelt over rammen
+async function chapterWindow(my, n, q, total, doneFlag) {
+  const t0 = performance.now(), dur = n === 1 ? TIMING.ch1 : TIMING.ch2, tEnd = t0 + dur;
+  skipCh = false;
+  await showChapter(n, total); if (!alive(my)) return;
+  let shown = 0, nextAt = 0;
+  while (alive(my)) {
+    const now = performance.now(), left = tEnd - now;
+    setClock(left);
+    if (left <= 0 || skipCh) break;
+    if (q.length && now >= nextAt) {
+      const it = q.shift(); shown++;
+      const remaining = Math.max(1, (total || P.length) - shown + 1);
+      const gap = clamp((left - 2600) / remaining, 700, 3200);
+      const lineDur = Math.min(clamp(gap * 2.7, 3000, 5600), Math.max(1600, left - 250));
+      markSpoke(it.pid); chEl.querySelector('.cp').textContent = `${shown} af ${total || P.length} har talt`;
+      showLine(it, lineDur); nextAt = now + gap;
+    }
+    if (doneFlag() && !q.length && shown > 0 && !R.speakers.length && left > 1200) {   // alle har talt: vent ikke paa uret
+      await wait(600); break;
+    }
+    await wait(120);
+  }
+  setClock(0);
+  P.forEach((p, i) => endLine(i));
+}
+async function run(my) {
+  LOG = []; R1 = {}; R2 = {}; SY = null; SESSION = null; lastErr = null;
+  closeCard(); hideReport(); hideReject(); hidePress();
+  labs.forEach(l => { l.classList.remove('speaking'); l.querySelector('u').className = ''; });
+  bubs.forEach(b => b.classList.remove('speak', 'on'));
+  R.pers.forEach(q => { q.landed = false; q.bt = -99; q.think = false; });
+  R.speakers = []; R.target = {}; R.msgs = [];
+  document.body.classList.add('room'); paintChat();
+  const live = CUR.mode === 'live';
+  const all = P.map((p, i) => i);
+  try {
+    // 0) vaernet og profilerne starter i samme sekund som ordene flyver
+    const screenP = live ? api('screen', { pitch: CUR.pitch, want: CUR.want })
+      : sleep(500).then(() => ({ ok: true, panel: DEMO_PANEL, emne: DEMO.emne, auto: true, token: 'demo' }));
+    R.phase = 'absorb'; R.tA = clock;
+    await absorb(CUR.pitch); if (!alive(my)) return;
+    R.phase = 'hum'; R.tH = clock; $('#rm-status').classList.add('on'); setSt('Værnet læser pitchen og finder de rette stemmer');
+    const sc = await Promise.race([screenP, sleep(30000).then(() => { throw { code: 'timeout', message: 'Værnet svarede ikke i tide.' }; })]);
+    if (!alive(my)) return;
+    if (!sc || !sc.ok) { rejectPitch(sc && sc.grund); return; }
+    setPanel(sc.panel, sc.auto); paintPanel(); EMNE = sc.emne || '';
+    SESSION = { pitch: CUR.pitch, want: CUR.want, panel: sc.panel, token: sc.token };
+    logPush({ round: 0, text: CUR.pitch, sub: CUR.want }); chatClear(CUR.pitch);
+    // 1) alt resten koerer i baggrunden fra nu
+    const S = background(my, live);
+    R.phase = 'assemble'; R.tAs = clock; setSt(EMNE ? `Panelet til ${EMNE.toLowerCase()} tager plads` : 'Panelet tager plads');
+    think(all, true);
+    await wait(REDUCED ? 300 : 3900); if (!alive(my)) return;
+    R.phase = 'council'; $('#rm-status').classList.remove('on');
+    // 2) kapitel 1: udfordringerne (fast ramme)
+    await chapterWindow(my, 1, S.q1, P.length, () => S.r1done); if (!alive(my)) return;
+    if (S.dead || !P.some(p => R1[p.id])) throw lastErr || new Error('Ingen svar');
+    // 3) kapitel 2: tweak it to love it (fast ramme)
+    think(P.filter(p => R1[p.id]).map(p => PBY[p.id]), true);
+    await chapterWindow(my, 2, S.q2, S.r2expect || P.filter(p => R1[p.id]).length, () => S.r2done); if (!alive(my)) return;
+    // 4) kapitel 3: animeret pause; rapporten er typisk allerede skrevet i baggrunden
+    think(all, false);
+    const t3 = performance.now(); skipCh = false;
+    document.body.classList.add('ch3');
+    R.phase = 'return'; R.tRet = clock;
+    showPress();
+    await showChapter(3); if (!alive(my)) return;
+    let slow = false;
+    while (alive(my)) {
+      const el = performance.now() - t3;
+      if (skipCh && S.synthDone) break;
+      if (el >= TIMING.ch3min && S.synthDone) break;
+      if (el >= TIMING.ch3max && !slow) { slow = true; chEl.querySelector('.cp').textContent = 'Moderatoren lægger sidste hånd på rapporten'; }
+      if (el >= TIMING.ch3max + TIMING.ch3grace) break;
+      await wait(150);
+    }
+    if (!alive(my)) return;
+    SY = S.synth || fallbackSynth();
+    chEl.querySelector('.cp').textContent = 'Rapporten er klar';
+    pressDone();
+    await wait(900); if (!alive(my)) return;
+    R.phase = 'verdict'; R.tV = clock; hideChapter();
+    await wait(900); if (!alive(my)) return;
+    hidePress(); showReport();
+  } catch (e) {
+    if (!alive(my)) return;
+    toast(errText(e), 9000);
+    reset(true);
+  }
+}
+// ── kapitel 3: rapporten saettes med animation (citater fra panelet, stemmer der taelles op) ──
+let pressT = null;
+function showPress() {
+  const el = $('#rm-press'), quotes = P.filter(p => R2[p.id] || R1[p.id]).map(p => ({ p, t: (R2[p.id] && R2[p.id].forslag) || R1[p.id].udfordring }));
+  const votes = { for: 0, betinget: 0, imod: 0 };
+  P.forEach(p => { const a = R1[p.id], b = R2[p.id]; if (a) votes[normVote(b ? b.stemme : a.stemme)]++; });
+  el.innerHTML = `<div class="pr-hd"><b>knowledge</b><span>board</span><em>Rapporten sættes</em></div>` +
+    `<div class="pr-h"><i></i><i></i></div><div class="pr-cols"><div><i></i><i></i><i></i><i></i><i></i></div><div><i></i><i></i><i></i><i></i></div></div>` +
+    `<blockquote class="pr-q"><span></span><cite></cite></blockquote>` +
+    `<div class="pr-v"><span><b data-n="${votes.for}">0</b> for</span><span><b data-n="${votes.betinget}">0</b> betinget</span><span><b data-n="${votes.imod}">0</b> imod</span></div>`;
+  el.classList.add('on'); el.classList.remove('done');
+  let k = 0; const q = el.querySelector('.pr-q');
+  const next = () => { if (!quotes.length) return; const x = quotes[k++ % quotes.length]; q.classList.remove('in'); void q.offsetWidth;
+    q.querySelector('span').textContent = x.t; q.querySelector('cite').textContent = x.p.n; q.style.setProperty('--c', x.p.c); q.classList.add('in'); };
+  next(); clearInterval(pressT); pressT = setInterval(next, 2100);
+  el.querySelectorAll('.pr-v b').forEach((b, n) => { const N = +b.dataset.n; let c = 0; const step = () => { if (c >= N) return; c++; b.textContent = c; setTimeout(step, 260 + n * 60); }; setTimeout(step, 900 + n * 300); });
+}
+function pressDone() { const el = $('#rm-press'); el.classList.add('done'); const em = el.querySelector('.pr-hd em'); if (em) em.textContent = 'Rapporten er klar'; clearInterval(pressT); }
+function hidePress() { clearInterval(pressT); $('#rm-press').classList.remove('on', 'done'); document.body.classList.remove('ch3'); }
+// ── vaernet: afvist pitch ──
+function rejectPitch(msg) {
+  reset(true);
+  const el = $('#kb-reject'); el.querySelector('p').textContent = msg || 'Boardet behandler ikke den pitch. Prøv med en forretningsidé.';
+  el.classList.add('on'); ripple(drops[0].c.clone().add(new THREE.Vector3(0, 0, drops[0].r)), 0.03); kick(0.05);
+  $('#kb-idea').focus();
+}
+function hideReject() { $('#kb-reject').classList.remove('on'); }
+function fallbackSynth() {
+  const first = P.filter(p => R1[p.id]).slice(0, 3);
+  return { overskrift: 'Panelets foreløbige indstilling', dom: 'Gult lys', resume: 'Rapporten kunne ikke samles denne gang. Nedenfor står panelets udfordringer og greb, som de blev sagt.',
+    udfordringer: first.map(p => ({ titel: p.n, tekst: R1[p.id].udfordring, hvem: [p.id] })),
+    greb: P.filter(p => R2[p.id]).slice(0, 3).map(p => ({ titel: p.n, tekst: R2[p.id].forslag, hvem: [p.id] })),
+    uenighed: { om: 'Se stemmerne nedenfor.', kriterie: 'Vælg det kriterie, der vejer tungest for dig.' },
+    naeste_skridt: [], spoergsmaal: P.map(p => R1[p.id] && R1[p.id].spoergsmaal).filter(Boolean).slice(0, 5), forbehold: 'Panelet er simuleret.', panel_eval: null };
+}
+const who = (ids) => [].concat(ids || []).map(id => PBY[id] != null ? `<span class="wh" style="--c:${P[PBY[id]].c}">${esc(P[PBY[id]].n)}</span>` : '').join('');
+function showReport() {
+  const sy = SY || fallbackSynth(), votes = { for: 0, imod: 0, betinget: 0 };
+  let rows = '';
+  P.forEach((p) => { const a = R1[p.id], b = R2[p.id]; if (!a) return;
+    const st = normVote(b ? b.stemme : a.stemme); votes[st]++;
+    rows += `<tr><td><i style="--c:${p.c}"></i>${esc(p.n)}</td><td>${esc(b && b.endelig ? b.endelig : a.udfordring)}</td><td class="st"><span class="pill ${st}">${VOTE[st]}</span></td></tr>`; });
+  const n = Object.keys(R1).filter(k => R1[k]).length, tot = votes.for + votes.imod + votes.betinget || 1;
+  const dom = String(sy.dom || 'Betinget grønt lys'); const domCls = /rødt/i.test(dom) ? 'red' : /gult/i.test(dom) ? 'amber' : /betinget/i.test(dom) ? 'cond' : 'green';
+  const date = new Date().toLocaleDateString('da-DK', { day: 'numeric', month: 'long', year: 'numeric' });
+  const pe = sy.panel_eval && typeof sy.panel_eval === 'object' ? sy.panel_eval : null;
+  const card = (x, k) => `<div class="rp-card"><div class="rp-n">${k + 1}</div><div><h5>${esc(x.titel || '')}</h5><p>${esc(x.tekst || '')}</p><div class="rp-who">${who(x.hvem)}</div></div></div>`;
+  const engine = CUR && CUR.mode === 'demo' ? 'demo' : modelName(CUR && CUR.model);
+  $('#rp-doc').innerHTML =
+    `<header class="rp-hd"><div class="rp-brand"><b>knowledge</b><span>board</span></div><div class="rp-meta">Validering af pitch &middot; ${esc(date)}<br>Simuleret panel &middot; ${n} anonyme roller &middot; ${esc(engine)}</div></header>` +
+    `<div class="rp-top"><span class="rp-kick">${esc(EMNE || 'Pitch')}</span><span class="rp-dom ${domCls}"><i></i>${esc(dom)}</span></div>` +
+    `<h1>${esc(sy.overskrift || 'Panelets indstilling')}</h1>` +
+    `<p class="rp-lead">${esc(sy.resume || '')}</p>` +
+    `<div class="rp-pitch"><small>Pitchen</small><p>${esc(CUR ? CUR.pitch : '')}</p>${CUR && CUR.want ? `<small>Det I ville gå hjem med</small><p>${esc(CUR.want)}</p>` : ''}</div>` +
+    `<h2><span>Del 1</span>Udfordringerne panelet ser</h2>${[].concat(sy.udfordringer || []).slice(0, 3).map(card).join('')}` +
+    `<h2><span>Del 2</span>Sådan gør I det til en succes</h2>${[].concat(sy.greb || []).slice(0, 3).map(card).join('')}` +
+    `<h2><span>Del 3</span>Det I selv skal beslutte</h2><p>${esc(sy.uenighed && sy.uenighed.om || '')}</p>` +
+    `<div class="rp-crit"><small>Kriteriet</small><div>${esc(sy.uenighed && sy.uenighed.kriterie || '')}</div></div>` +
+    ([].concat(sy.naeste_skridt || []).length ? `<h3>Anbefalede næste skridt</h3><ol>${[].concat(sy.naeste_skridt).map(x => '<li>' + esc(x) + '</li>').join('')}</ol>` : '') +
+    `<h3>Spørgsmål I skal kunne svare på</h3><ul>${[].concat(sy.spoergsmaal || []).slice(0, 5).map(x => '<li>' + esc(x) + '</li>').join('')}</ul>` +
+    `<h3>Panelets stemmer</h3><div class="rp-tally"><i style="width:${votes.for / tot * 100}%;background:#2f5d46"></i><i style="width:${votes.betinget / tot * 100}%;background:#1f3a5f"></i><i style="width:${votes.imod / tot * 100}%;background:#9b1b22"></i></div>` +
+    `<div class="rp-tl"><span><b>${votes.for}</b> for</span><span><b>${votes.betinget}</b> betinget</span><span><b>${votes.imod}</b> imod</span></div>` +
+    `<table class="rp-vt"><tbody>${rows}</tbody></table>` +
+    (pe ? `<h3>Om panelet</h3><p class="rp-small">${pe.mangler ? '<b>Manglede:</b> ' + esc(pe.mangler) + ' ' : ''}${pe.redundans ? '<b>Overlap:</b> ' + esc(pe.redundans) + ' ' : ''}${pe.forslag ? '<b>Forslag:</b> ' + esc(pe.forslag) : ''}</p>` : '') +
+    `<footer class="rp-ft"><p>${esc(sy.forbehold || '')} ${PANEL_AUTO ? 'Panelet blev sammensat automatisk til netop denne pitch. ' : ''}Stemmerne er simulerede, anonyme roller, ikke rigtige personer. Hos Knowledgeboard sidder over 250 rigtige medlemmer, og det er gratis at pitche.</p></footer>`;
+  const rp = $('#rp'); rp.classList.add('on'); $('#rp-doc').scrollTop = 0; rp.scrollTop = 0;
+  document.body.classList.add('verd');
+}
+function hideReport() { $('#rp').classList.remove('on'); document.body.classList.remove('verd'); }
+function reportText() {
+  const sy = SY || fallbackSynth();
+  let t = 'KNOWLEDGEBOARD · VALIDERING AF PITCH (simuleret panel af anonyme roller)\n\n' + (sy.dom ? sy.dom + ': ' : '') + sy.overskrift + '\n\n' + (sy.resume || '') + '\n\nPITCH\n' + (CUR ? CUR.pitch : '') + (CUR && CUR.want ? '\nVil gå hjem med: ' + CUR.want : '') + '\n\n';
+  t += 'UDFORDRINGER\n' + [].concat(sy.udfordringer || []).map((x, k) => (k + 1) + '. ' + x.titel + ': ' + x.tekst).join('\n') + '\n\n';
+  t += 'SÅDAN GØR I DET TIL EN SUCCES\n' + [].concat(sy.greb || []).map((x, k) => (k + 1) + '. ' + x.titel + ': ' + x.tekst).join('\n') + '\n\n';
+  t += 'BESLUT SELV\n' + (sy.uenighed ? sy.uenighed.om + '\nKriterie: ' + sy.uenighed.kriterie : '') + '\n\n';
+  if ((sy.naeste_skridt || []).length) t += 'NÆSTE SKRIDT\n' + sy.naeste_skridt.map((x, k) => (k + 1) + '. ' + x).join('\n') + '\n\n';
+  t += 'SPØRGSMÅL\n' + [].concat(sy.spoergsmaal || []).map(x => '- ' + x).join('\n') + '\n\nREFERAT\n';
+  LOG.forEach((e) => { if (e.round === 0) return; const p = P[PBY[e.pid]]; t += (e.round === 1 ? '[Udfordring] ' : '[Greb] ') + p.n + (e.target && PBY[e.target] != null ? ' til ' + P[PBY[e.target]].n : '') + ': ' + e.text + '\n'; });
+  return t;
+}
+function copyLog() {
+  const b = $('#rp-copy');
+  try { navigator.clipboard.writeText(reportText()).then(() => { b.textContent = 'Kopieret'; }, () => { b.textContent = 'Kunne ikke kopiere'; }); } catch (e) { b.textContent = 'Kunne ikke kopiere'; }
+}
+function reset(keepText) {
+  RUNID++; wake();
+  R.phase = 'idle'; R.speakers = []; R.target = {}; R.msgs = []; R.pers.forEach(q => { q.landed = false; q.think = false; });
+  closeCard(); hideReport(); hideChapter(); hidePress(); $('#rm-status').classList.remove('on'); $('#rm-log').classList.remove('on');
+  labs.forEach(l => { l.classList.remove('speaking'); l.querySelector('u').className = ''; });
+  bubs.forEach(b => b.classList.remove('speak', 'on'));
+  document.body.classList.remove('room', 'verd', 'ch3');
+  if (!keepText && E.mode !== 'demo') { $('#kb-idea').value = ''; $('#kb-want').value = ''; }
+  updCount();
+}
+
+// ── rolle-kort ──
+function openCard(i) {
+  const p = P[i], a = R1[p.id], card = $('#rm-card');
+  if (!a) { if (ROOM_ON.has(R.phase)) toast(p.n + ' har ikke taget stilling endnu.'); return; }
+  const b = R2[p.id], pr = p.prof || {};
+  card.style.setProperty('--c', p.c);
+  card.innerHTML = `<button class="x" type="button" aria-label="Luk">&times;</button><div class="hd"><i></i><b>${esc(p.n)}</b></div><div class="lensl">${esc(p.lens)} &middot; simuleret rolle</div>` +
+    (pr.taenker ? `<p class="tk">${esc(pr.taenker)}</p>` : '') +
+    `<h4>Udfordringen</h4><q>${esc(a.udfordring)}</q><ul>${(a.hvorfor || []).map(x => '<li>' + esc(x) + '</li>').join('')}</ul>` +
+    (b ? `<h4>Greb${b.target && b.target !== p.id && PBY[b.target] != null ? ', til ' + esc(P[PBY[b.target]].n) : ''}</h4><p>${esc(b.forslag)}</p><ul>${[].concat(b.hvordan || []).map(x => '<li>' + esc(x) + '</li>').join('')}</ul><h4>Endelig position</h4><p>${esc(b.endelig || '')}</p>` : '') +
+    `<h4>Ville spørge dig</h4><p>${esc(a.spoergsmaal || '')}</p><h4>Sikkerhed · blindt punkt</h4><p>${esc(a.confidence || '')}. ${esc(a.blindspot || '')}</p>`;
+  card.classList.add('on');
+  const r = labs[i].getBoundingClientRect(), cw = card.offsetWidth, ch = card.offsetHeight;
+  let left = clamp(r.left + r.width / 2 - cw / 2, 16, innerWidth - cw - 16), top = r.top - ch - 12;
+  if (top < 70) top = Math.min(innerHeight - ch - 16, r.bottom + 12);
+  if (MOBILE) { left = 16; top = Math.max(70, innerHeight - ch - 16); }
+  card.style.left = left + 'px'; card.style.top = Math.max(70, top) + 'px';
+  card.querySelector('.x').onclick = closeCard;
+}
+function closeCard() { $('#rm-card').classList.remove('on'); }
+
+// ── UI-haandtag ──
+function updCount() { $('#kb-count').textContent = $('#kb-idea').value.length + ' tegn'; }
+$('#kb-idea').addEventListener('input', () => { updCount(); hideReject(); });
+$('#kb-idea').addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); start(); } });
+$('#kb-form').addEventListener('submit', (ev) => { ev.preventDefault(); start(); });
+$('#kb-reject button').addEventListener('click', hideReject);
+$('#rm-skip').addEventListener('click', () => { skipCh = true; wake(); });
+$('#rp-new').addEventListener('click', () => reset(false));
+$('#rp-copy').addEventListener('click', copyLog);
+$('#rp-print').addEventListener('click', () => { try { window.print(); } catch (e) {} });
+$('#rp-log').addEventListener('click', () => $('#rm-log').classList.toggle('on'));
+$('#ch-skip').addEventListener('click', () => { skipCh = true; wake(); });
+$('#rm-stop').addEventListener('click', () => reset(true));
+$('#rm-logbtn').addEventListener('click', () => $('#rm-log').classList.toggle('on'));
+$('#rm-logx').addEventListener('click', () => $('#rm-log').classList.remove('on'));
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') { closeCard(); $('#rm-log').classList.remove('on'); $('#eng-pop').classList.remove('on'); } });
+$('#kb-eng').addEventListener('click', () => {
+  const pop = $('#eng-pop'); if (pop.classList.contains('on')) { pop.classList.remove('on'); return; }
+  pop.classList.add('on'); $('#eng-err').hidden = true;
+  const m = E.mode === 'probe' ? 'demo' : E.mode;
+  $$('input[name=eng]', pop).forEach(r => { r.checked = r.value === m; });
+});
+$('#eng-close').addEventListener('click', () => $('#eng-pop').classList.remove('on'));
+$('#eng-save').addEventListener('click', () => {
+  const sel = $('input[name=eng]:checked'); const v = sel ? sel.value : 'demo'; const err = $('#eng-err');
+  if (v === 'live' && !E.live) { err.hidden = false; err.textContent = 'Serveren har ingen OpenRouter-nøgle endnu.'; return; }
+  E.mode = v; paintEngine(); $('#eng-pop').classList.remove('on');
+});
+
+// ═══ LOOP ══════════════════════════════════════════════════════
+let clock = 0, last = performance.now(), tStart = null, frameN = 0, fpsAcc = 0, fpsN = 0, fpsShown = 0;
+const paper = new THREE.Color();
+const lookM = new THREE.Matrix4(), up = new THREE.Vector3(0, 1, 0), right = new THREE.Vector3(1, 0, 0), upv = new THREE.Vector3(0, 1, 0);
+const curEl = matchMedia('(hover:hover) and (pointer:fine)').matches && !MOBILE ? $('.kb-cur') : null, curPos = { x: -99, y: -99 };
+if (curEl) document.body.classList.add('cur');
+let adaptT = 0, adaptFrames = 0, lastNav = '', wallA = 0, wallWho = -1, chatW = 0;
+const FORCED = FORCE_ROOM !== null;
+
+function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now; clock += dt;
+  if (tStart === null) tStart = clock + 0.85;
+  const tIntro = clock - tStart;
+
+  // rummets vaegte: kranen tilbage (w), moerkefelt-finalen (v), draabens summen (hum)
+  const wT = (ROOM_ON.has(R.phase) || R.phase === 'verdict') ? 1 : 0, vT = R.phase === 'verdict' ? 1 : 0;
+  const humT = (R.phase === 'absorb' || R.phase === 'hum') ? 1 : R.phase === 'assemble' ? 0.5 : R.phase === 'council' ? 0.3 : R.phase === 'return' ? 0.7 : 0;
+  if (FORCED) { R.w = wT; R.v = vT; R.hum = humT; }
+  else { R.w += (wT - R.w) * (1 - Math.exp(-dt * (wT ? 1.1 : 1.8))); R.v += (vT - R.v) * (1 - Math.exp(-dt * 1.05)); R.hum += (humT - R.hum) * (1 - Math.exp(-dt * 3)); }
+  const rw = ease(R.w), rv = ease(R.v);
+
+  // kamera: hero -> rummet -> moerkefelt
+  const A = HERO_CAM;
+  camPos.fromArray(A.cam); camTgt.fromArray(A.tgt);
+  let fov = A.fov, ap = A.ap, key = A.key, dark = A.dark, iri = A.iri; paper.copy(A.paper);
+  camPos.z -= 0.55 * R.hum * (1 - rw);
+  for (const [C, wgt] of [[ROOM_CAM, rw], [VERD_CAM, rv]]) {
+    if (wgt < 0.0005) continue;
+    camPos.lerp(vB.fromArray(C.cam), wgt); camTgt.lerp(vB.fromArray(C.tgt), wgt);
+    fov = mix(fov, C.fov, wgt); ap = mix(ap, C.ap, wgt); paper.lerp(C.paper, wgt);
+    key = mix(key, C.key, wgt); dark = mix(dark, C.dark, wgt); iri = mix(iri, C.iri, wgt);
+  }
+  // chatpanel aabent: rummet centreres i den venstre del og zoomes lidt ud, saa panelet ikke daekker figurerne
+  chatW += ((document.body.classList.contains('chat') ? 1 : 0) - chatW) * (FORCED ? 1 : 1 - Math.exp(-dt * 3));
+  { const k = chatW * rw * (1 - rv);
+    if (k > 0.001) { const pw = 338, sc = (innerWidth - pw) / innerWidth;
+      const f2 = 2 * Math.atan(Math.tan(fov * Math.PI / 360) / sc) * 180 / Math.PI; fov = mix(fov, f2, k);
+      const d = camPos.distanceTo(camTgt), sx = (pw / 2) / (innerWidth / 2) * Math.tan(fov * Math.PI / 360) * (innerWidth / innerHeight) * d * k;
+      camPos.x += sx; camTgt.x += sx; } }
+  // lave vinduer: flyt rummet ned under kapitel-overskriften (kameraet loeftes parallelt = lens shift)
+  { const hdr = 185 / innerHeight, over = Math.max(0, hdr - 0.2);
+    if (over > 0 && rw > 0) { const sh = over * 2 * Math.tan(fov * Math.PI / 360) * camPos.distanceTo(camTgt) * rw * (1 - rv); camPos.y += sh; camTgt.y += sh; } }
+  ptr.sx += ((ptr.has ? ptr.x : 0) - ptr.sx) * (1 - Math.exp(-dt * 3));
+  ptr.sy += ((ptr.has ? ptr.y : 0) - ptr.sy) * (1 - Math.exp(-dt * 3));
+  const dist = camPos.distanceTo(camTgt);
+  lookM.lookAt(camPos, camTgt, up);
+  right.setFromMatrixColumn(lookM, 0); upv.setFromMatrixColumn(lookM, 1);
+  const par = 0.05 * dist * (1 - rw * 0.7);
+  camPos.addScaledVector(right, ptr.sx * par + Math.sin(clock * 0.31) * 0.012 * dist).addScaledVector(upv, ptr.sy * par * 0.6 + Math.sin(clock * 0.23 + 1) * 0.008 * dist);
+  lookM.lookAt(camPos, camTgt, up);
+  camRot.setFromMatrix4(lookM);
+  tanF = Math.tan(fov * Math.PI / 360);
+  U.uCamPos.value.copy(camPos); U.uCamRot.value.copy(camRot); U.uTanF.value = tanF;
+  persp.position.copy(camPos); persp.quaternion.setFromRotationMatrix(lookM); persp.fov = fov; persp.updateProjectionMatrix(); persp.updateMatrixWorld();
+  U.uPaper.value.copy(paper); U.uKey.value = key; U.uDark.value = dark; U.uIri.value = iri;
+
+  // vaeg-print: "knowledge board" i hero, navnet paa den der taler i rummet
+  const wallD = Math.abs(camPos.z + 2.6) || 8;
+  const halfW = Math.tan(fov * Math.PI / 360) * wallD * persp.aspect;
+  let textA = 1 - rw;
+  if (rw > 0.02) {
+    const sp = R.speakers.length ? R.speakers[R.speakers.length - 1] : -1;
+    if (sp !== wallWho) { wallA = FORCED ? wallA : 0; wallWho = sp; }
+    wallA += ((sp >= 0 ? 1 : 0) - wallA) * (FORCED ? 1 : 1 - Math.exp(-dt * 5));
+    if (sp >= 0) { drawWall([P[sp].n.toLowerCase()]); U.uInk.value.copy(pcol[sp]).lerp(WHITE, 0.25); }
+    U.uInkGlow.value = 0.12 * wallA;
+    textA = 0;
+    const W = Math.min(halfW * (NARROW() ? 1.6 : 0.95), 5.6), H = W / 2;
+    U.uTextRect.value.set(-W / 2, 0.62 - H / 2, W / 2, 0.62 + H / 2);
+  } else {
+    drawWall(['knowledge', 'board']); U.uInkGlow.value = 0.0; U.uInk.value.setRGB(0.07, 0.1, 0.16);
+    const W = Math.min(halfW * 2 * (NARROW() ? 0.94 : 0.8), 6.4), H = W / 2, cy = NARROW() ? 1.5 : 0.58;
+    U.uTextRect.value.set(-W / 2, cy - H / 2, W / 2, cy + H / 2);
+  }
+  U.uTextA.value = textA;
+  U.uCloud.value = 0;
+
+  // draaber
+  const st = sceneState(clock, tIntro);
+  roomDrops(clock, dt);
+  U.uK.value = drag ? Math.max(st.k, 0.5) : st.k;
+  JELLY.forEach((J, i) => {
+    J.v.addScaledVector(J.o, -70 * dt).multiplyScalar(Math.exp(-dt * 7));
+    J.o.addScaledVector(J.v, dt); const m = drops[i].r * 0.32; if (J.o.length() > m) J.o.setLength(m);
+    if (drops[i].r > 0.05) drops[i].c.add(J.o);
+  });
+  tend.on = Math.max(tend.on - dt * 7, 0);
+  if (drag && drag.r > 0.004) {
+    const d = drops[0], dir = drag.tip.clone().sub(d.c); const L = dir.length(); dir.normalize();
+    const base = d.c.clone().addScaledVector(dir, d.r * 0.55), f = drag.frac || 0;
+    const mid = d.c.clone().addScaledVector(dir, mix(d.r, L, 0.5));
+    tend.a.set(base.x, base.y, base.z, d.r * mix(0.42, 0.3, f));
+    tend.m.set(mid.x, mid.y, mid.z, d.r * mix(0.2, 0.055, f));
+    tend.b.set(drag.tip.x, drag.tip.y, drag.tip.z, drag.r);
+    tend.on = 1;
+  } else if (tend.on > 0) { tend.m.w *= 0.7; tend.b.w *= 0.75; tend.a.w *= 0.8; }
+  U.uTA.value.copy(tend.a); U.uTM.value.copy(tend.m); U.uTB.value.copy(tend.b); U.uTon.value = tend.on > 0.02 && tend.b.w > 0.004 ? 1 : 0;
+  for (let k = free.length - 1; k >= 0; k--) {
+    const f = free[k], parD = drops[0]; f.t += dt;
+    if (f.t > f.hold) f.v.addScaledVector(parD.c.clone().sub(f.p), dt * 14);
+    f.v.y -= dt * (f.t < f.hold ? 3.2 : 0.8);
+    f.v.multiplyScalar(Math.exp(-dt * (f.t < f.hold ? 0.6 : 3.2)));
+    f.p.addScaledVector(f.v, dt);
+    if (f.p.y - f.r < -1.35) { f.p.y = -1.35 + f.r; f.v.y *= -0.35; }
+    if (f.p.distanceTo(parD.c) < parD.r * 0.92) { f.r -= dt * 0.9; if (!f.merged) { f.merged = true; ripple(f.p, 0.018); JELLY[0].v.addScaledVector(f.v, 0.08); } }
+    if (f.r <= 0.005 || f.t > 6) free.splice(k, 1);
+  }
+  drops[15].r = 0;
+  if (free[0]) { const d = drops[15]; d.c.copy(free[0].p); d.r = Math.max(free[0].r, 0); d.liq.copy(drops[0].liq); }
+  const J0 = JELLY[0].v, js = (a) => 1 + clamp(Math.abs(a) * 0.1, 0, 0.16);
+  let sx = js(J0.x), sy = st.stretch * js(J0.y), sz = js(J0.z); const vol = Math.cbrt(sx * sy * sz);
+  sx /= vol; sy /= vol; sz /= vol;
+  U.uStretch.value.set(sx, sy, sz);
+  const bc = new THREE.Vector3(); let cnt = 0;
+  drops.forEach((d, n) => { U.uDrop.value[n].set(d.c.x, d.c.y, d.c.z, d.r); U.uLiq.value[n].set(d.liq.r, d.liq.g, d.liq.b); if (d.r > 0.004) { bc.add(d.c); cnt++; } });
+  bc.divideScalar(Math.max(cnt, 1));
+  let br = 0.1; drops.forEach(d => { if (d.r > 0.004) br = Math.max(br, d.c.distanceTo(bc) + d.r * Math.max(sx, sy, sz, 1.0)); });
+  if (U.uTon.value > 0.5) br = Math.max(br, bc.distanceTo(tmpV.set(tend.b.x, tend.b.y, tend.b.z)) + tend.b.w);
+  U.uBound.value.set(bc.x, bc.y, bc.z, br + 0.34);
+
+  const bsp = 1 + R.hum * 2.2;
+  bubSeed.forEach((b, n) => {
+    const d = drops[0]; if (d.r < 0.15) { U.uBub.value[n].set(0, 0, 0, 0); return; }
+    const yl = ((b.y + clock * b.sp * bsp) % 1) * 1.5 - 0.75;
+    const rr = b.rr * Math.sqrt(Math.max(0, 1 - yl * yl)), a = b.a + clock * 0.15;
+    const fade = sstep(0.75, 0.55, yl) * sstep(-0.75, -0.6, yl);
+    U.uBub.value[n].set(d.c.x + Math.cos(a) * rr * d.r, d.c.y + yl * d.r * sy, d.c.z + Math.sin(a) * rr * d.r, b.r * d.r * fade);
+  });
+
+  // beroering
+  let ptrW = 0, dentW = 0, hov = null, overDrop = false;
+  ptr.vx *= Math.exp(-dt * 6); ptr.vy *= Math.exp(-dt * 6);
+  if (ptr.has && !REDUCED && !ptr.over) {
+    const rd = rayFromNDC(ptr.x, ptr.y);
+    hov = drag ? null : hitDrop(rd);
+    overDrop = !!hov || hitFigure(rd) >= 0;
+    const spd = Math.hypot(ptr.vx, ptr.vy);
+    if (hov) {
+      const d = drops[0], J = JELLY[0];
+      U.uDent.value.x = hov.p.x; U.uDent.value.y = hov.p.y; U.uDent.value.z = hov.p.z;
+      dentW = 0.05 * d.r + Math.min(spd * 0.006, 0.02);
+      const dd = hov.p.distanceTo(camPos);
+      const vw = new THREE.Vector3().addScaledVector(right, ptr.vx * tanF * persp.aspect * dd).addScaledVector(upv, ptr.vy * tanF * dd);
+      J.v.addScaledVector(vw, dt * 2.4);
+      if (spd > 0.25 && clock - wakeT > 0.06) { ripple(hov.p, Math.min(0.005 + spd * 0.006, 0.022)); wakeT = clock; }
+      if (spd > 3.0 && clock - flickT > 0.35) {
+        flickT = clock; const dir = vw.clone().normalize();
+        spawnFree(hov.p.clone().addScaledVector(hov.n, 0.04), dir.multiplyScalar(Math.min(vw.length() * 0.45, 5)).addScaledVector(hov.n, 1.2), d.r * (0.1 + Math.random() * 0.06), 0, 0.45);
+        ripple(hov.p, 0.03); kick(0.02);
+      }
+    } else if (!drag) {
+      const d = drops[0];
+      if (d.r >= 0.25) {
+        const tt = Math.max(tmpV.copy(d.c).sub(camPos).dot(rd), 0); const q = camPos.clone().addScaledVector(rd, tt); const bd = q.distanceTo(d.c) / d.r;
+        if (bd < 1.8) {
+          const dir = q.clone().sub(d.c); if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1); dir.normalize();
+          const pnt = d.c.clone().addScaledVector(dir, d.r * 1.02);
+          U.uPtr.value.x += (pnt.x - U.uPtr.value.x) * 0.3; U.uPtr.value.y += (pnt.y - U.uPtr.value.y) * 0.3; U.uPtr.value.z += (pnt.z - U.uPtr.value.z) * 0.3;
+          ptrW = 0.11 * sstep(1.8, 1.0, bd) * d.r;
+        }
+      }
+    }
+    if (drag) {
+      const d = drops[0];
+      if (d.r < 0.25) release(true);
+      else {
+        drag.tgt.copy(camPos).addScaledVector(rd, drag.depth);
+        const off = drag.tgt.clone().sub(d.c), L = off.length(), maxL = d.r * 2.3;
+        const frac = clamp((L - d.r * 0.85) / (d.r * 1.5));
+        const dir = off.clone().normalize();
+        drag.tip.lerp(d.c.clone().addScaledVector(dir, Math.min(Math.max(L, d.r * 0.9), maxL)), 1 - Math.exp(-dt * 18));
+        drag.frac = frac;
+        drag.r = d.r * mix(0.3, 0.2, frac) * sstep(0.0, 0.08, frac);
+        JELLY[0].v.addScaledVector(off, frac * dt * 1.6 * d.r);
+        if (L > d.r * 2.9) release(true);
+      }
+    }
+  }
+  if (drag && !ptr.has) release(false);
+  U.uDent.value.w += (dentW - U.uDent.value.w) * (1 - Math.exp(-dt * 10));
+  U.uPtr.value.w += (ptrW - U.uPtr.value.w) * (1 - Math.exp(-dt * 6));
+  ripples.forEach((r, n) => { U.uRip.value[n].set(r.p.x, r.p.y, r.p.z, clock - r.t0); U.uRipA.value[n] = r.a; });
+  for (let n = ripples.length; n < NRIP; n++) { U.uRip.value[n].w = -1; U.uRipA.value[n] = 0; }
+  while (ripples.length && clock - ripples[0].t0 > 3.2) ripples.shift();
+
+  if (curEl) {
+    curPos.x += (ptr.cx - curPos.x) * (1 - Math.exp(-dt * 22)); curPos.y += (ptr.cy - curPos.y) * (1 - Math.exp(-dt * 22));
+    curEl.style.transform = `translate3d(${curPos.x.toFixed(1)}px, ${curPos.y.toFixed(1)}px, 0)`;
+    curEl.classList.toggle('drop', overDrop && !drag); curEl.classList.toggle('hold', !!drag); curEl.classList.toggle('link', ptr.over);
+  }
+
+  wobKick *= Math.exp(-dt * 1.6);
+  { // draaben er gennemsigtig i hero og fyldes, naar pitchen flyver ind (og lidt allerede mens man skriver)
+    const typed = Math.min(($('#kb-idea').value.length || 0) / 220, 1);
+    const gT = R.phase === 'idle' ? 0.8 - 0.28 * typed : 0;
+    U.uGhost.value += (gT - U.uGhost.value) * (FORCED ? 1 : 1 - Math.exp(-dt * (gT > U.uGhost.value ? 1.5 : 2.2)));
+    if (tIntro < 0.3 && R.phase === 'idle') U.uGhost.value = gT;
+  }
+  U.uWob.value = (REDUCED ? 0.008 : 0.017) + wobKick + (st.introW || 0) + R.hum * 0.03;
+  U.uTime.value = REDUCED ? clock * 0.35 : clock;
+
+  // fokus: rack focus paa den der taler, ellers draaben
+  let fd = 1e9;
+  const sp = R.speakers.length ? R.speakers[R.speakers.length - 1] : -1;
+  if (rw > 0.5 && sp >= 0) { fd = camPos.distanceTo(CH[sp].head) - 0.1; ap = mix(ap, 10, rw * (1 - rv)); }
+  else { const d = drops[0]; if (d.r > 0.2) fd = camPos.distanceTo(d.c) - d.r * 0.92; }
+  FOCUS.value += ((fd < 1e8 ? fd : dist) - FOCUS.value) * (FORCED ? 1 : 1 - Math.exp(-dt * 5));
+  DUSTU.uDim.value = 1 - 0.75 * rv;
+  if (dof) {
+    dof.uniforms.uAp.value = ap;
+    lens.uniforms.uVig.value = mix(0.16, 0.5, U.uDark.value);
+    renderer.toneMappingExposure = mix(1.08, 1.25, U.uDark.value);
+    bloom.strength = mix(0.16, 0.75, U.uDark.value);
+  }
+
+  placeOverlays();
+  const lum = 0.2126 * paper.r + 0.7152 * paper.g + 0.0722 * paper.b;
+  const navCol = lum > 0.28 ? '#15171c' : '#ffffff';
+  if (navCol !== lastNav) { document.documentElement.style.setProperty('--nav', navCol); lastNav = navCol; }
+
+  if (composer) composer.render(dt);
+
+  frameN++; fpsAcc += dt; fpsN++;
+  if (fpsAcc > 0.5) { fpsShown = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
+  adaptT += dt; adaptFrames++;
+  if (adaptT > 2.0 && !FORCED && renderer) {
+    const f = adaptFrames / adaptT; adaptT = 0; adaptFrames = 0;
+    if (f < 40 && quality > 0.5) { quality = Math.max(0.5, quality * 0.82); resize(); }
+    else if (f > 58 && quality < Math.min(devicePixelRatio, 1.25) - 0.05 && !MOBILE) { quality = Math.min(Math.min(devicePixelRatio, 1.25), quality * 1.1); resize(); }
+  }
+  if (frameN === 3) { markReady(); document.body.dataset.ready = '1'; }
+  requestAnimationFrame(frame);
+}
+function layoutKeys() {}
+window.__KB = { U, R, E, CH, fps: () => fpsShown, quality: () => quality, drops, R1, run: () => RUNID };
+
+// ── verifikation: laas rummet paa en fase med demo-data ──
+function forceRoom(stage) {
+  E.mode = 'demo'; paintEngine(); CUR = { pitch: DEMO.pitch, want: DEMO.want, mode: 'demo' };
+  RUNID++; setPanel(DEMO_PANEL, true); paintPanel(); EMNE = DEMO.emne;
+  document.body.classList.add('room');
+  R.tAs = -100; R.tV = -100; R.tRet = -100;
+  R.pers.forEach(q => { q.landed = true; q.bt = -100; });
+  logPush({ round: 0, text: DEMO.pitch, sub: DEMO.want }); chatClear(DEMO.pitch); paintChat(); chatChapter(1);
+  const upto = stage === 'council' ? 6 : P.length;
+  P.forEach((p, i) => { if (i < upto) { R1[p.id] = DEMO.r1[p.id]; setVote(i, R1[p.id].stemme); chatLine(i, null, R1[p.id].udfordring); logPush({ round: 1, pid: p.id, text: R1[p.id].udfordring, list: R1[p.id].hvorfor }); } else R.pers[i].think = true; });
+  if (stage === 'verdict') { P.forEach(p => { R2[p.id] = DEMO.r2[p.id]; }); SY = DEMO.synth; R.phase = 'verdict'; showReport(); return; }
+  R.phase = 'council';
+  const C = (n) => { const X = CHAPTERS[n - 1]; chEl.querySelector('.ce').textContent = `Kapitel ${n} af 3`; chEl.querySelector('.cq').textContent = X.q; chEl.querySelector('.cs').textContent = X.sub;
+    chEl.querySelectorAll('.steps i').forEach((el, k) => { el.className = k < n - 1 ? 'done' : k === n - 1 ? 'now' : ''; }); };
+  if (stage === 'chapter') { C(2); setProgress(0, P.length); chEl.classList.add('on', 'intro'); document.body.classList.add('chintro'); return; }
+  if (stage === 'press') { P.forEach(p => { R2[p.id] = DEMO.r2[p.id]; }); R.phase = 'return'; document.body.classList.add('ch3'); C(3); setProgress(0, 1, true); chEl.classList.add('on', 'top'); showPress(); return; }
+  if (stage === 'reject') { reset(true); $('#kb-idea').value = 'test'; rejectPitch('Boardet behandler ikke den slags indhold. Prøv med en forretningsidé.'); return; }
+  chEl.classList.add('on', 'top'); setClock(9400);
+  if (stage === 'council') { C(1); setProgress(6, P.length); showLine({ run: RUNID, round: 1, pid: 'p6', text: DEMO.r1.p6.udfordring, vote: 'imod' }, 1e9); showLine({ run: RUNID, round: 1, pid: 'p2', text: DEMO.r1.p2.udfordring, vote: 'for' }, 1e9); return; }
+  P.forEach(p => { R2[p.id] = DEMO.r2[p.id]; });
+  C(2); setProgress(5, P.length);
+  showLine({ run: RUNID, round: 2, pid: 'p11', target: 'p1', text: DEMO.r2.p11.forslag, vote: 'betinget' }, 1e9);
+  showLine({ run: RUNID, round: 2, pid: 'p9', target: 'p6', text: DEMO.r2.p9.forslag, vote: 'for' }, 1e9);
+  showLine({ run: RUNID, round: 2, pid: 'p3', target: 'p4', text: DEMO.r2.p3.forslag, vote: 'for' }, 1e9);
+  R.msgs = [{ from: 10, to: 0, t0: clock - 5e5, dur: 1e6, slot: 14 }];
+}
+
+addEventListener('resize', () => { resize(); });
+(document.fonts && document.fonts.load ? Promise.all([document.fonts.load('600 200px "Source Serif 4"'), document.fonts.load('400 20px "Source Serif 4"'), document.fonts.ready]) : Promise.resolve())
+  .catch(() => {}).then(() => {
+    resize();
+    drawWall(['knowledge', 'board']);
+    probeEngine();
+    try { const d = new Date().toLocaleDateString('da-DK', { weekday: 'long', day: 'numeric', month: 'long' }); $('#kb-date').textContent = d.charAt(0).toUpperCase() + d.slice(1) + ' · Pitch-rummet'; } catch (e) {}
+    updCount();
+    if (FORCE_ROOM) { tStart = -10; forceRoom(FORCE_ROOM); }
+    requestAnimationFrame((t) => { last = t; frame(t); });
+  });
+
+</script>
+</body>
+</html>
